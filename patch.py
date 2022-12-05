@@ -1,35 +1,36 @@
 
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 import torchvision
 import datetime
-import cv2
 import uuid
 import image_transformation
+import calibration.distorsion
+import math
 
 class PatchDesc():
-    def __init__(self, image_dim, patch_relative_size):
-        assert patch_relative_size >=  0 and patch_relative_size < 1
+    def __init__(self, image_dim, patch_relative_size, cam_mtx, dist_coef):
+        assert patch_relative_size >  0 and patch_relative_size < 1
         self.target_class = 1   #0: 'blocked', 1 : 'free'
         self.image_dim = image_dim
         self.patch_dim = None
         self.patch = None
         self.threshold = 0.9
         self.max_iterations = 10
-        self.random_init(patch_relative_size)
-        self.id = uuid.uuid4()
-        self.transform = torchvision.transforms.Compose([
-            torchvision.transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
-            torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ])
+        self.image_transformer = image_transformation.ImageTransformer()
+        self.cam_mtx = cam_mtx
+        self.dist_coef = dist_coef
         
+        self.id = uuid.uuid4()
+        self.random_init(patch_relative_size)
 
     def random_init(self, patch_relative_size):
         image_size = self.image_dim**2
         patch_size = image_size * patch_relative_size
         self.patch_dim = int(patch_size**(0.5))
         self.patch = torch.rand(1, 3, self.patch_dim, self.patch_dim)
+        #impose symetry
+        self.patch = (self.patch + torch.flip(self.patch, [3]))/2
 
     def random_rotation(self):
         assert self.patch is not None
@@ -37,125 +38,142 @@ class PatchDesc():
         for i in range(3):
             self.patch[0, i, :, :] = torch.rot90(self.patch[0, i, :, :], k)
 
-    def random_translation_in_empty_image(self):
-        assert self.patch is not None
+    def random_translation(self):
         assert self.patch_dim is not None
-        empty_image_patch = torch.zeros((1, 3, self.image_dim, self.image_dim))
-        new_patch_pos = np.random.choice(self.image_dim - self.patch_dim, size=2)
-        x, y = new_patch_pos
-        empty_image_patch[0, :, x:x + self.patch_dim, y:y + self.patch_dim] = self.patch
-        return {'x' : x, 'y' : y}, empty_image_patch
+        return np.random.choice(self.image_dim - self.patch_dim, size=2)
     
-    def get_mask(self, empty_image_patch):
-        mask = torch.zeros_like(empty_image_patch)
-        mask[empty_image_patch != 0] = 1
+    def get_mask(self, empty_img_p):
+        mask = torch.zeros_like(empty_img_p)
+        mask[empty_img_p != 0] = 1 
         return mask
+
+    def get_empty_image_patch(self, row0, col0):
+        assert self.patch is not None
+        empty_img_p = torch.zeros(1, 3, self.image_dim, self.image_dim)
+        empty_img_p[0, :, row0:row0 + self.patch_dim, col0:col0 + self.patch_dim] = self.patch
+        return empty_img_p
     
     def random_transform(self):
-        assert self.patch is not None
         #self.random_rotation()
-        p_pos, empty_image_patch = self.random_translation_in_empty_image()
-        mask = self.get_mask(empty_image_patch)
-        return {'empty_image_patch': empty_image_patch, 'mask' : mask, 'patch_pos': p_pos}
+        row0, col0 = self.random_translation()
+        empty_img_p = self.get_empty_image_patch(row0, col0)
+        distorded_patch, map_ = calibration.distorsion.distort_patch(self.cam_mtx, self.dist_coef, empty_img_p)
+        mask = self.get_mask(distorded_patch)
+        return empty_img_p, distorded_patch, map_, mask, row0, col0
 
-    def batch_attack(self, model, img, empty_img_p, mask):
+    def image_attack(self, model, img, empty_img_p, mask):
         model.eval() # https://stackoverflow.com/questions/60018578/what-does-model-eval-do-in-pytorch
         c = 0
-
         while True :
             adv_img = torch.mul((1-mask), img) + torch.mul(mask, empty_img_p)
-            adv_img = torch.clamp(adv_img, 0, 1)
             var_adv_img = torch.autograd.Variable(adv_img.data, requires_grad=True)
-            transformed_adv_img = self.transform(var_adv_img)
-            vector_scores = model(transformed_adv_img)
+            vector_scores = model(self.image_transformer.normalize(var_adv_img))
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
-            target_proba = vector_proba.data[0][self.target_class]
-            '''
-            print('iteration %d target probability %f threshold %f' % (c, target_proba, self.threshold))
-            '''  
-            c+=1 
-            
+            target_proba = vector_proba[0, self.target_class]
+            print('iteration %d target proba mean %f' % (c, target_proba))
+            c += 1
             if target_proba >= self.threshold or c >= self.max_iterations :
                 break
-            
-            loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)[0][self.target_class]
-            loss.backward()
-            
-            transformed_adv_img -= var_adv_img.grad
-            empty_img_p = torch.mul(mask, transformed_adv_img)
-            """
-            empty_img_p -= var_adv_img.grad
-            """
-        return adv_img, vector_proba
+            loss_target = -torch.nn.functional.log_softmax(vector_scores, dim=1)[0, self.target_class]
+            loss_target.backward()
+            e = 1
+            empty_img_p -= e * var_adv_img.grad
+            empty_img_p = torch.clamp(empty_img_p, 0, 1)
+        return adv_img, target_proba
+    
+    def check(self, model, img, true_label):
+        vector_scores = model(self.image_transformer.normalize(img))
+        model_label = torch.argmax(vector_scores.data).item()
+        if model_label is not true_label.item() :
+            return None
+        if model_label is self.target_class :
+            return None
+        
+        _, distorded_patch, _, mask, _, _ = self.random_transform()
+        
+        adv_img = torch.mul((1-mask), img) + torch.mul(mask, distorded_patch)
+        adv_img = torch.clamp(adv_img, 0, 1)
+        vector_scores = model(self.image_transformer.normalize(adv_img))
+        adv_label = torch.argmax(vector_scores.data).item()
+        
+        vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
+        print('target proba %f' % vector_proba.data[0][self.target_class])
+        if adv_label == self.target_class:
+            return True
+        return False
+        
 
-    def train(self, model, train_loader, path_img_folder, path_training_results):
+    def validation(self, model, valid_loader):
+        total, success = 0, 0
+        for _, (img, true_label) in enumerate(valid_loader):
+            res = self.check(model, img, true_label)
+            if (res == None):
+                continue
+            elif (res == False):
+                total += 1
+            elif (res == True) :
+                success += 1
+                total += 1
+        assert total != 0
+        return success/total
+            
+    def train(self, n_epochs, model, train_loader, valid_loader, path_img_folder, path_training_results):
         assert self.patch is not None
         assert self.patch_dim is not None
         
         with open(path_training_results, 'a') as f :
             f.write('id %s\n' % self.id)
             f.write(str(datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')) + '\n')
-            
         
             model.eval()
-            success, total = 0, 0
             
-            for _, (img, true_label) in enumerate(train_loader):
-                transformed_img = self.transform(img)
-                vector_scores = model(transformed_img)
-                model_label = torch.argmax(vector_scores.data).item()
-                if model_label is not true_label.item() :
-                    continue
-                if model_label is self.target_class :
-                    continue
+            for epoch in range(n_epochs) :
+                success, total = 0, 0
+                f.write('epoch %d\n' % epoch)
+                for _, (img, true_label) in enumerate(train_loader):
+                    scores = model(self.image_transformer.normalize(img))
+                    model_label = torch.argmax(scores.data, dim=1).item()
+                    if model_label is not true_label.item() :
+                        continue
+                    if model_label is self.target_class :
+                        continue
+                    total += 1
+                    
+                    empty_img_p, distorded_patch, map_, mask, row0, col0 = self.random_transform()
+                    adv_img, target_proba = self.image_attack(model, img, distorded_patch, mask)
+                    
+                    if target_proba >= self.threshold :
+                        success += 1
+                    
+                    distorded_patch = torch.mul(mask, adv_img)
+                    empty_img_p = calibration.distorsion.undistort_patch(empty_img_p, distorded_patch, map_)
+                    
+                    self.patch = empty_img_p[0, :, row0:row0+self.patch_dim, col0:col0+self.patch_dim]
+                    
+                    if (total % 5 == 0):
+                        
+                        torchvision.utils.save_image(img.data, path_img_folder 
+                                                    + 'epoch%d_batch%d_label%d_original.png' 
+                                                    % (epoch, total, true_label.item()), normalize=True)
+                        
+                        torchvision.utils.save_image(adv_img.data, path_img_folder 
+                                                    + 'epoch%d_batch%d_adversarial.png' 
+                                                    % (epoch, total), normalize=True)
+                        
+                        torchvision.utils.save_image(self.patch.data, path_img_folder
+                                                    + 'epoch%d_batch%d_patch.png' 
+                                                    % (epoch, total), normalize=True)
+                        
+                        torchvision.utils.save_image(distorded_patch.data, path_img_folder
+                                                    + 'epoch%d_batch%d_distorded_patch.png' 
+                                                    % (epoch, total), normalize=True)
+                    
+                        
+                    #validation_rate = self.validation(model, valid_loader)
+                    validation_rate = 0
+                    print('img %d success rate %f val rate %f' % (total - 1, success/total, validation_rate))
+                    f.write('img %d success rate %f val rate %f\n' % (total - 1, success/total, validation_rate))
                 
-                total +=1
-                
-                transform = self.random_transform()
-                empty_img_p = transform['empty_image_patch']
-                mask = transform['mask']
-                            
-                adv_img, vector_proba = self.batch_attack(model, img, empty_img_p, mask)
-                
-                adv_label = torch.argmax(vector_proba.data).item()
-                if adv_label is self.target_class :
-                    success += 1
-                            
-                x, y = transform['patch_pos']['x'], transform['patch_pos']['y']
-                self.patch = adv_img[:, :, x:x + self.patch_dim, y:y + self.patch_dim]
-
-                torchvision.utils.save_image(transformed_img.data, path_img_folder 
-                                            + 'batch%d_label%d_original.png' 
-                                            % (total, true_label.item()), normalize=True)
-                
-                torchvision.utils.save_image(self.transform(adv_img).data, path_img_folder 
-                                            + 'batch%d_label%d_adversarial.png' 
-                                            % (total, adv_label), normalize=True)
-                
-                torchvision.utils.save_image(self.transform(empty_img_p).data, path_img_folder
-                                            + 'batch%d_patch.png' 
-                                            % (total), normalize=True)
-                '''
-                def tensor_to_numpy_array(tensor):
-                    tensor = torch.squeeze(tensor)
-                    array = tensor.cpu().numpy()
-                    return np.transpose(array, (1, 2, 0))
-
-                _, (ax1, ax2) = plt.subplots(2, 2)
-                ax1[0].imshow(tensor_to_numpy_array(transform['empty_image_patch']), interpolation='nearest')
-                ax1[0].set_title('avant entrainement')
-                ax1[1].imshow(tensor_to_numpy_array(empty_img_p), interpolation='nearest')
-                ax1[1].set_title('apres entrainement')
-                
-                ax2[0].imshow(tensor_to_numpy_array(img), interpolation='nearest')
-                ax2[0].set_title('img')
-                ax2[1].imshow(tensor_to_numpy_array(adv_img), interpolation='nearest')
-                ax2[1].set_title('adv img')
-                plt.show()
-                '''
-                
-                print('batch %d success rate %f' % (total - 1, success/total))
-                f.write('batch %d success rate %f\n' % (total - 1, success/total))
 
     def test(self, model, test_loader, path_test_results):
         model.eval()
@@ -166,27 +184,14 @@ class PatchDesc():
             f.write(str(datetime.datetime.now().strftime('%d//%m//%Y %H:%M:%S')) + '\n')
             
             for _, (img, true_label) in enumerate(test_loader):
-                vector_scores = model(self.transform(img))
-                model_label = torch.argmax(vector_scores.data).item()
-                if model_label is not true_label.item() :
+                res = self.check(model, img, true_label)
+                if (res == None):
                     continue
-                if model_label is self.target_class :
-                    continue
-                
-                total += 1
-                
-                transform = self.random_transform()
-                empty_img_p = transform['empty_image_patch']
-                mask = transform['mask']
-                
-                adv_img = torch.mul((1-mask), img) + torch.mul(mask, empty_img_p)
-                adv_img = torch.clamp(adv_img, 0, 1)
-                adv_img = self.transform(adv_img)
-                vector_scores = model(self.transform(adv_img))
-                adv_label = torch.argmax(vector_scores.data).item()
-                
-                if adv_label == self.target_class:
+                elif (res == False):
+                    total += 1
+                elif (res == True) :
                     success += 1
+                    total += 1
                     
-                print('batch %d success rate %f' % (total - 1, success/total))
-                f.write('batch %d success rate %f\n' % (total - 1, success/total))
+                print('img %d success rate %f' % (total - 1, success/total))
+                f.write('img %d success rate %f\n' % (total - 1, success/total))

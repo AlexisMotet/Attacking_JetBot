@@ -1,8 +1,10 @@
 import numpy as np
 import torch
 #https://stackoverflow.com/questions/58127381/opencv-how-to-apply-camera-distortion-to-an-image?noredirect=1&lq=1
+#https://stackoverflow.com/questions/70205469/when-will-camera-distortion-coefficients-change
 
 def load_coef(path_calibration):
+    #https://stackoverflow.com/questions/39432322/what-does-the-getoptimalnewcameramatrix-do-in-opencv
     cam_mtx = np.loadtxt(path_calibration + 'camera_matrix.txt', dtype=float)
     dist_coef = np.loadtxt(path_calibration + 'distorsion_coefficients.txt', dtype=float)
     return cam_mtx, dist_coef
@@ -15,6 +17,7 @@ def distort_patch(cam_mtx, dist_coef, empty_img_p) :
     
     distorded_patch = torch.zeros_like(empty_img_p)
     
+    map_ = {}
     dim_x, dim_y = empty_img_p.shape[3], empty_img_p.shape[2]
     for x in range(dim_x) :
         for y in range(dim_y):
@@ -22,24 +25,30 @@ def distort_patch(cam_mtx, dist_coef, empty_img_p) :
             nx = (x - cx)/fx
             ny = (y - cy)/fy
             
-            #radial distorsion
+            #radial distorsion and tangential distorsion
             r2 = nx**2 + ny**2
-            icdist = 1/(1 - ((k3 * r2 + k2) * r2 + k1) * r2)
+            dx = nx + nx * (k1*r2 + k2*r2**2 +k3*r2**3)
+            dy = ny + ny * (k1*r2 + k2*r2**2 +k3*r2**3)
             
-            #tangential distorsion
-            deltax = 2 * p1 * nx * ny + p2 * (r2 + 2 * nx**2)
-            deltay = p1 * (r2 + 2 * y**2) + 2 * p2 * x * y
-            
-            nx = (nx + deltax) * icdist
-            ny = (ny + deltay) * icdist
-            
-            dx = int(nx * fx + cx)
-            dy = int(ny * fy + cy)
+            dx = int(dx * fx + cx)
+            dy = int(dy * fy + cy)
             if 0 <= dx < dim_x and  0 <= dy < dim_y :
-                distorded_patch[0, :, dy, dx] = empty_img_p[0, :, dy, dx]
-    return distorded_patch
+                distorded_patch[0, :, dy, dx] = empty_img_p[0, :, y, x]
+                map_[(dx, dy)] = (x, y)
+    return distorded_patch, map_
+
+def undistort_patch(empty_img_p, distorded_patch, map_):
+    zero = torch.zeros(3)
+    for dp, p in map_.items() :
+            dx, dy = dp
+            x, y = p
+            if not torch.any(torch.eq(distorded_patch[0, :, dy, dx], zero)) :
+                empty_img_p[0, : , y, x] = distorded_patch[0, :, dy, dx]
+    return empty_img_p
+
 '''
 if __name__=='__main__' :
-    cam_mtx, dist_coef = load_coef()
+    path_calibration = 'C:\\Users\\alexi\\PROJET_3A\\projet_CAS\\calibration\\'
+    cam_mtx, dist_coef = load_coef(path_calibration)
     distort_patch(cam_mtx, dist_coef, torch.tensor(np.zeros((1, 3, 224, 224))))
 '''

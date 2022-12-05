@@ -2,8 +2,8 @@ import numpy as np
 import cv2 as cv
 import glob
 
-NROWS = 4
-NCOLUMNS = 4
+NROWS = 3
+NCOLUMNS = 3
 
 if __name__=="__main__" :
     
@@ -39,33 +39,6 @@ if __name__=="__main__" :
 
     np.savetxt('camera_matrix.txt', mtx, fmt='%f')
     np.savetxt('distorsion_coefficients.txt', dist, fmt='%f')
-
-
-    img = cv.imread(fname)
-    h,  w = img.shape[:2]
-    newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
-
-    # undistort
-    dst = cv.undistort(img, mtx, dist, None, newcameramtx)
-    # crop the image
-    x, y, w, h = roi
-    dst = dst[y:y+h, x:x+w]
-    cv.imshow('dst', dst)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
-    
-    '''
-    # undistort
-    mapx, mapy = cv.initUndistortRectifyMap(mtx, dist, None, newcameramtx, (w,h), 5)
-    dst = cv.remap(img, mapx, mapy, cv.INTER_LINEAR)
-    # crop the image
-    x, y, w, h = roi
-    print('ROI %d %d' % (w, h))
-    dst = dst[y:y+h, x:x+w]
-    cv.imshow('dst', dst)
-    cv.waitKey(0)
-    cv.destroyAllWindows()
-    '''
 
     mean_error = 0
     for i in range(len(objpoints)):
