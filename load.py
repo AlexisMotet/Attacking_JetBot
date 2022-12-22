@@ -1,8 +1,7 @@
 import torch
 import torchvision
 
-def load_model(path_dataset, path_model):
-    
+def load_dataset(path_dataset):
     dataset = torchvision.datasets.ImageFolder(
         path_dataset,
         torchvision.transforms.Compose([
@@ -39,7 +38,7 @@ def load_model(path_dataset, path_model):
         shuffle=True,
         num_workers=0
     )
-
+    
     test_loader = torch.utils.data.DataLoader(
         test_dataset,
         batch_size=1,
@@ -53,15 +52,13 @@ def load_model(path_dataset, path_model):
         shuffle=True,
         num_workers=0
     )
+    return train_loader, validation_loader, test_loader
 
+def load_model(path_model):
+    
     model = torchvision.models.alexnet(pretrained=False) # pretrained false ?
     model.classifier[6] = torch.nn.Linear(model.classifier[6].in_features, 2)
     model.load_state_dict(torch.load(path_model, map_location=torch.device('cpu')))
     
-    return model, train_loader, validation_loader, test_loader
+    return model
 
-
-if __name__=='__main__' :
-    path_dataset = 'U:\\PROJET_3A\\projet_BONTEMPS_SCHAMPHELEIRE\\Project Adverserial Patch\\Collision Avoidance\\dataset'
-    path_model = 'U:\\PROJET_3A\\projet_BONTEMPS_SCHAMPHELEIRE\\Project Adverserial Patch\\Collision Avoidance\\best_model_extended.pth'
-    load_model(path_dataset, path_model)
