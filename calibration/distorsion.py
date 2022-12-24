@@ -37,6 +37,45 @@ def distort_patch(cam_mtx, dist_coef, empty_img_p) :
                 map_[(dx, dy)] = (x, y)
     return distorded_patch, map_
 
+def distort_patch1(cam_mtx, dist_coef, empty_with_patch) :
+    fx, fy, cx, cy = cam_mtx[0][0], cam_mtx[1][1], cam_mtx[0][2], cam_mtx[1][2]
+    k1, k2, k3 = dist_coef[0], dist_coef[1], dist_coef[4]
+    
+    distorded_patch = torch.zeros(1, 3, 224, 224)
+    
+    dim_x, dim_y = empty_with_patch.shape[3], empty_with_patch.shape[2]
+    
+    for x in range(dim_x) :
+        for y in range(dim_y):
+            #normalize the point
+            nx = (x - cx)/fx
+            ny = (y - cy)/fy
+            
+            #radial distorsion and tangential distorsion
+            r2 = nx**2 + ny**2
+            dx = nx + nx * (k1*r2 + k2*r2**2 +k3*r2**3)
+            dy = ny + ny * (k1*r2 + k2*r2**2 +k3*r2**3)
+            
+            dx = int(dx * fx + cx)
+            dy = int(dy * fy + cy)
+            if 0 <= dx < dim_x and  0 <= dy < dim_y :
+                distorded_patch[0, :, dy, dx] = empty_with_patch[0, :, y, x]
+    return distorded_patch
+
+def distort(x, y, image, distorded, dim_x, dim_y, cx, cy, fx, fy, k1, k2, k3):
+    nx = (x - cx)/fx
+    ny = (y - cy)/fy
+    
+    r2 = nx**2 + ny**2
+    dx = nx + nx * (k1*r2 + k2*r2**2 +k3*r2**3)
+    dy = ny + ny * (k1*r2 + k2*r2**2 +k3*r2**3)
+    
+    dx = int(dx * fx + cx)
+    dy = int(dy * fy + cy)
+    if 0 <= dx < dim_x and  0 <= dy < dim_y :
+        distorded[0, :, dy, dx] = image[0, :, y, x]
+
+
 def undistort_patch(empty_img_p, distorded_patch, map_):
     zero = torch.zeros(3)
     for dp, p in map_.items() :

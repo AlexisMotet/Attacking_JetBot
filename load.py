@@ -1,7 +1,9 @@
 import torch
 import torchvision
+import numpy as np
 
 def load_dataset(path_dataset):
+    """
     dataset = torchvision.datasets.ImageFolder(
         path_dataset,
         torchvision.transforms.Compose([
@@ -13,13 +15,12 @@ def load_dataset(path_dataset):
     dataset = torchvision.datasets.ImageFolder(
         path_dataset,
         torchvision.transforms.Compose([
-            torchvision.transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
+            #torchvision.transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
             torchvision.transforms.Resize((224, 224)),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
     )
-    """
     ratio = 2/3
     n_train = int(ratio * len(dataset))
     n_test = len(dataset) - n_train
@@ -62,3 +63,5 @@ def load_model(path_model):
     
     return model
 
+if __name__=="__main__":
+    pass

@@ -21,6 +21,7 @@ class ImageTransformationTestCase(unittest.TestCase):
     def test_normalization(self):
         _, (ax1, ax2, ax3) = plt.subplots(1, 3)
         for img, _ in self.patch_desc.train_loader :
+            print(img)
             ax1.imshow(tensor_to_numpy_array(img), interpolation='nearest')
             ax1.set_title('original image')
             
@@ -31,6 +32,20 @@ class ImageTransformationTestCase(unittest.TestCase):
             unnormalized_img = self.patch_desc.image_transformer.unnormalize(normalized_img)
             ax3.imshow(tensor_to_numpy_array(unnormalized_img), interpolation='nearest')
             ax3.set_title('unnormalized image')
+            plt.show()
+            plt.close()
+            break
+    
+    def test_normalization2(self):
+        _, (ax1, ax2) = plt.subplots(1, 2)
+        for img, _ in self.patch_desc.train_loader :
+            ax1.imshow(tensor_to_numpy_array(img), interpolation='nearest')
+            ax1.set_title('normalized image')
+            
+            unnormalized_img = self.patch_desc.image_transformer.unnormalize(img)
+            ax2.imshow(tensor_to_numpy_array(unnormalized_img), interpolation='nearest')
+            ax2.set_title('unnormalized image')
+            
             plt.show()
             plt.close()
             break
@@ -57,7 +72,7 @@ class ImageTransformationTestCase(unittest.TestCase):
 
                 ax1.imshow(tensor_to_numpy_array(empty_image_patch), interpolation='nearest')
                 ax1.set_title('empty image patch')
-                
+                """
                 distorded_patch, map_ = calibration.distorsion.distort_patch(self.patch_desc.cam_mtx, 
                                                                              self.patch_desc.dist_coef, 
                                                                              empty_image_patch)
@@ -68,6 +83,13 @@ class ImageTransformationTestCase(unittest.TestCase):
                                                                            distorded_patch, map_)
                 ax3.imshow(tensor_to_numpy_array(undistorded_patch), interpolation='nearest')
                 ax3.set_title('after undistorsion')
+                """
+                
+                distorded_patch = calibration.distorsion.distort_patch1(self.patch_desc.cam_mtx, 
+                                                                             self.patch_desc.dist_coef, 
+                                                                             empty_image_patch)
+                ax2.imshow(tensor_to_numpy_array(distorded_patch), interpolation='nearest')
+                ax2.set_title('after distorsion')
                 plt.pause(0.05)
         plt.show()
         plt.close()
@@ -302,6 +324,9 @@ class VariousTestCase(unittest.TestCase):
             #torch.nn.MaxPool2d(kernel_size=(224,224))
         )
         
+        self.patch_desc = patch.PatchDesc()
+        self.patch_desc.load_everything()
+        
     def test_gradient(self):
         self.model.eval()
         for img, _ in self.train_loader :
@@ -313,6 +338,19 @@ class VariousTestCase(unittest.TestCase):
             #print(score)
             #score.backward()
             break
+        
+    def test_model(self):
+        self.patch_desc.model.eval()
+        success = 0
+        for img, true_label in self.train_loader :
+            img = self.patch_desc.image_transformer.unnormalize(img)
+            vector_scores = self.patch_desc.model(img)
+            model_label = torch.argmax(vector_scores.data).item()
+            if model_label is not true_label.item() :
+                continue
+            success += 1
+        print(success/len(self.train_loader))
+            
             
 if __name__ == '__main__':
     unittest.main()
