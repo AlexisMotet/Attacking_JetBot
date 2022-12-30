@@ -6,6 +6,7 @@ import distorsion
 import total_variation
 import printability
 import pickle
+import sklearn.cluster
 
 resize_dim = 256
 image_dim = 224
@@ -15,8 +16,8 @@ mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 limit_train_len = 150
 limit_test_len = 80
-n_enreg_img = 10
-path_image_folder = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\img\\'
+n_enreg_img = 2
+path_image_folder = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\images\\'
 
 
 def load_dataset(path_dataset):
@@ -56,7 +57,7 @@ def load_model(path_model, n_classes):
 
 class PatchTrainer():
     def __init__(self, path_model, path_dataset, path_calibration, path_printable_vals,
-                 n_classes=10, target_class=2, patch_relative_size=0.05, distort=True, 
+                 n_classes=2, target_class=1, patch_relative_size=0.05, distort=True, 
                  n_epochs=1, lambda_tv=0.0005, lambda_print=0.005, threshold=0.9, max_iterations=10):
 
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -112,10 +113,14 @@ class PatchTrainer():
                 total += len(label)
                 print('sucess/total : %d/%d accuracy : %f' % (success, total, (100 * success/float(total))))
     
-    def image_attack(self, image):
+    def image_attack(self, image, row0, col0):
         self.model.eval()
         c = 0
-
+        """
+        empty_with_patch = torch.zeros(1, 3, image_dim, image_dim)
+        empty_with_patch[0, :, row0:row0 + self.patch_dim, 
+                         col0:col0 + self.patch_dim] = self.patch
+        """
         empty_with_patch, row0, col0 = self.random_transform()
         mask = self.get_mask(empty_with_patch)
         while True :
@@ -133,7 +138,7 @@ class PatchTrainer():
             loss_target = -torch.nn.functional.log_softmax(vector_scores, dim=1)[0, self.target_class]
             loss_target.backward()
             grad = var_adversarial_image.grad.clone()
-            var_adversarial_image.data.zero_()
+            var_adversarial_image.grad.data.zero_()
 
             grad = self.grad_normalization(grad)
             empty_with_patch -= grad
@@ -149,10 +154,14 @@ class PatchTrainer():
             empty_with_patch[0, :, row0:row0 + self.patch_dim, col0:col0 + self.patch_dim] = self.patch 
         return first_target_proba, adversarial_image, empty_with_patch
 
-    def image_attack_with_distorsion(self, image):
+    def image_attack_with_distorsion(self, image, row0, col0):
         self.model.eval()
         c = 0
-
+        """
+        empty_with_patch = torch.zeros(1, 3, image_dim, image_dim)
+        empty_with_patch[0, :, row0:row0 + self.patch_dim, 
+                         col0:col0 + self.patch_dim] = self.patch
+        """
         empty_with_patch, row0, col0 = self.random_transform()
         empty_with_patch_distorded, map = self.distorsion_tool.distort(empty_with_patch)
         mask = self.get_mask(empty_with_patch_distorded)
@@ -164,7 +173,9 @@ class PatchTrainer():
             target_proba = torch.nn.functional.softmax(vector_scores, dim=1)[0, self.target_class].item()
             if (c == 0):
                 first_target_proba = target_proba
-            print('iteration : %d target proba : %f' % (c, target_proba))
+                print('first target proba : %f' % first_target_proba)
+            else :
+                print('iteration : %d target proba : %f' % (c, target_proba))
             c += 1
             if target_proba >= self.threshold or c > self.max_iterations :
                 break
@@ -173,7 +184,7 @@ class PatchTrainer():
             loss_target = loss[0, self.target_class]
             loss_target.backward()
             grad = var_adversarial_image.grad.clone()
-            var_adversarial_image.data.zero_()
+            var_adversarial_image.grad.data.zero_()
 
             grad = self.grad_normalization(grad)
             empty_with_patch_distorded -= grad
@@ -204,14 +215,43 @@ class PatchTrainer():
         return mask
     
     def test(self):
+        kMeans = sklearn.cluster.KMeans(n_clusters = 1)
+        weights = torch.ones_like(self.patch)
         total, success = 0, 0
         for image, true_label in self.test_loader :
-            vector_scores = self.model(self.normalize(image))
+            var_image = torch.autograd.Variable(image, requires_grad=True)
+            vector_scores = self.model(var_image)
             model_label = torch.argmax(vector_scores.data).item()
             if model_label is not true_label.item() or model_label is self.target_class :
                 continue
             total += 1
+            
+            #a modifier
+            
+            loss_model = -torch.nn.functional.log_softmax(vector_scores, 
+                                                          dim=1)[0, model_label]
+            loss_model.backward()
+            
+            grad = var_image.grad.clone()
+            var_image.grad.data.zero_()
+                
+            output = torch.nn.functional.conv2d(torch.abs(grad), 
+                                                weights)
+            output = torch.squeeze(output).numpy()
+            output = output/np.max(output)
+            output = np.where(output < 0.5, 0, 1)
+            X  = np.transpose(output.nonzero())
+            kMeans.fit(X)
+            
+            row, col = kMeans.cluster_centers_[0]
+            row0 = int(max(row - self.patch_dim, 0))
+            col0 = int(max(col - self.patch_dim/2, 0))
+            empty_with_patch = torch.zeros(1, 3, image_dim, image_dim)
+            empty_with_patch[0, :, row0:row0 + self.patch_dim, 
+                             col0:col0 + self.patch_dim] = self.patch
+            
             empty_with_patch, _, _ = self.random_transform()
+            print(self.distort)
             if (self.distort) :
                 empty_with_patch_distorded, _ = self.distorsion_tool.distort(empty_with_patch)
                 mask = self.get_mask(empty_with_patch_distorded)
@@ -232,22 +272,48 @@ class PatchTrainer():
         
             
     def train(self):
+        clusters = {}
+        kMeans = sklearn.cluster.KMeans(n_clusters = self.n_epochs)
+        weights = torch.ones_like(self.patch)
         self.model.eval()
         for epoch in range(self.n_epochs) :
             total = 0
             self.target_proba_train[epoch] = []
             for image, true_label in self.train_loader :
-                vector_scores = self.model(image)
+                var_image = torch.autograd.Variable(image, requires_grad=True)
+                vector_scores = self.model(var_image)
                 model_label = torch.argmax(vector_scores.data).item()
                 if model_label is not true_label.item() or model_label is self.target_class  :
                     continue
+                
+                #a modifier
+                """
+                loss_model = -torch.nn.functional.log_softmax(vector_scores, dim=1)[0, model_label]
+                loss_model.backward()
+                grad = var_image.grad.clone()
+                var_image.grad.data.zero_()
+                
+                output = torch.nn.functional.conv2d(torch.abs(grad), 
+                                                    weights)
+                output = torch.squeeze(output).numpy()
+                output = output/np.max(output)
+                output = np.where(output < 0.5, 0, 1)
+                X  = np.transpose(output.nonzero())
+                kMeans.fit(X)
+                clusters[image] = kMeans.cluster_centers_
 
+                row, col = clusters[image][epoch]
+
+                row0 = int(max(row - self.patch_dim, 0))
+                col0 = int(max(col - self.patch_dim/2, 0))
+                """
+                
                 total += 1
 
                 if (self.distort) :
-                    first_target_proba, adversarial_image, empty_with_patch = self.image_attack_with_distorsion(image)
+                    first_target_proba, adversarial_image, empty_with_patch = self.image_attack_with_distorsion(image, None, None)
                 else :
-                    first_target_proba, adversarial_image, empty_with_patch = self.image_attack(image)
+                    first_target_proba, adversarial_image, empty_with_patch = self.image_attack(image, None, None)
 
                 if (total % n_enreg_img == 0):
                     torchvision.utils.save_image(image.data, path_image_folder 
@@ -281,5 +347,5 @@ if __name__=="__main__":
     path_calibration = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\calibration\\'
     path_printable_vals = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\printable_vals.dat'
     patch_trainer = PatchTrainer(path_model, path_dataset, path_calibration, path_printable_vals, 
-                                       n_classes=4, target_class=1, distort=False, patch_relative_size=0.01, n_epochs=2)
+                                       n_classes=2, target_class=1, distort=False, patch_relative_size=0.01, n_epochs=2)
     patch_trainer.test_model()

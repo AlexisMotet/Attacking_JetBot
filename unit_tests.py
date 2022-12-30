@@ -7,10 +7,10 @@ import distorsion
 import total_variation
 import printability
 
-path_model = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\imagenette2-160_model.pth'
-path_dataset = 'U:\\PROJET_3A\\imagenette2-160\\train'
-path_calibration = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\\calibration\\'
-path_printable_vals = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\printable_vals.dat'
+path_model = 'C:\\Users\\alexi\\PROJET_3A\\Projet Adversarial Patch\\Project Adverserial Patch\\Collision Avoidance\\best_model_extended.pth'
+path_dataset = 'C:\\Users\\alexi\\PROJET_3A\\Projet Adversarial Patch\\Project Adverserial Patch\\Collision Avoidance\\dataset'
+path_calibration = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\calibration\\'
+path_printable_vals = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\printable_vals.dat'
 
 def tensor_to_numpy_array(tensor):
     tensor = torch.squeeze(tensor)
@@ -164,6 +164,28 @@ class VariousTestCase(unittest.TestCase):
         ax3.imshow(tensor_to_numpy_array(grad), interpolation='nearest')
         ax3.set_title('grad')
 
+        plt.show()
+        plt.close()
+        
+    def test_rotation(self):
+        import rotation, math
+        _, (ax1, ax2, ax3) = plt.subplots(1, 3)
+        rotation_tool = rotation.RotationTool()
+        for i in range(50):
+            rad = math.radians(i)
+            im = torch.zeros(1, 3, 224, 224)
+            im[0, :, 50:100, 50:100] = torch.ones(50, 50)
+            ax1.imshow(tensor_to_numpy_array(im), interpolation='nearest')
+            ax1.set_title('before rotation')
+            rot, mat = rotation_tool.rotate(im, 0, rad, 0)
+            ax2.imshow(tensor_to_numpy_array(rot), interpolation='nearest')
+            ax2.set_title('rotation')
+            
+            im = rotation_tool.undo_rotate(rot, mat)
+            
+            ax3.imshow(tensor_to_numpy_array(im), interpolation='nearest')
+            ax3.set_title('undo rotation')
+            plt.pause(0.5)
         plt.show()
         plt.close()
 
