@@ -1,6 +1,5 @@
 import ctypes
 import numpy as np
-import calibration.distorsion
 import torch
 
 class CamMtx(ctypes.Structure):
@@ -18,9 +17,9 @@ class DistCoefs(ctypes.Structure):
         ("k3", ctypes.c_float),
     ]
 
-class DistorsionTool():
-    def __init__(self, path_calibration) :
-        lib = ctypes.cdll.LoadLibrary("./distorsion.so")
+class DistortionTool():
+    def __init__(self, path_calibration, path_distortion) :
+        lib = ctypes.cdll.LoadLibrary(path_distortion)
         self.cdistort = lib.cdistort
         self.cdistort.restype = None
         self.cdistort.argtypes = [np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
@@ -47,7 +46,8 @@ class DistorsionTool():
                         np.ctypeslib.ndpointer(ctypes.c_uint32, flags="C_CONTIGUOUS"),
                         np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS")]
 
-        cam_mtx, dist_coefs = calibration.distorsion.load_coef(path_calibration)
+        cam_mtx = np.loadtxt(path_calibration + 'camera_matrix2.txt', dtype=float)
+        dist_coefs = np.loadtxt(path_calibration + 'distortion_coefficients2.txt', dtype=float)
     
         self.mtx = CamMtx()
         self.mtx.fx, self.mtx.fy, self.mtx.cx, self.mtx.cy = cam_mtx[0][0], cam_mtx[1][1], \
@@ -81,7 +81,7 @@ if __name__=="__main__" :
     import torch
     import new_patch
     import matplotlib.pyplot as plt
-    import calibration.distorsion
+    import calibration.distortion
     def tensor_to_numpy_array(tensor):
         tensor = torch.squeeze(tensor)
         array = tensor.detach().cpu().numpy()
@@ -108,13 +108,13 @@ if __name__=="__main__" :
     t2 = time.time()
     print(t2 - t1)
 
-    cam_mtx, dist_coefs = calibration.distorsion.load_coef(path_calibration)
+    cam_mtx, dist_coefs = calibration.distortion.load_coef(path_calibration)
     print(empty_with_patch.shape)
     t1 = time.time()
-    empty_with_patch_distorded, map_ = calibration.distorsion.distort_patch(cam_mtx, dist_coefs, empty_with_patch)
+    empty_with_patch_distorded, map_ = calibration.distortion.distort_patch(cam_mtx, dist_coefs, empty_with_patch)
     ax4.imshow(tensor_to_numpy_array(empty_with_patch_distorded), interpolation='nearest')
 
-    empty_with_patch = calibration.distorsion.undistort_patch(empty_with_patch, empty_with_patch_distorded, map_)
+    empty_with_patch = calibration.distortion.undistort_patch(empty_with_patch, empty_with_patch_distorded, map_)
     ax5.imshow(tensor_to_numpy_array(empty_with_patch), interpolation='nearest')
     t2 = time.time()
     print(t2 - t1)

@@ -10,10 +10,10 @@ def total_variation(image):
 
     d_row = r_row - image
     d_col = r_col - image
-    s = torch.sqrt((d_row**2 + d_col**2))
-    tv_loss = torch.sum(s)
+    sqrt = torch.sqrt((d_row**2 + d_col**2))
+    tv_loss = torch.sum(sqrt)
 
-    reciprocal = torch.reciprocal(torch.fmax(s, 1e-5 * torch.ones_like(s)))
+    reciprocal = torch.reciprocal(torch.fmax(sqrt, 1e-5 * torch.ones_like(sqrt)))
     d_row *= reciprocal
     d_col *= reciprocal
     

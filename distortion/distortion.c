@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 
-// gcc -fPIC -shared -Wall -o distorsion.so distorsion.c
+// gcc -fPIC -shared -Wall -o distortion.so distortion.c
 
 typedef struct cam_mtx
 {

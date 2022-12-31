@@ -3,23 +3,31 @@ import new_patch
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-import distorsion
-import total_variation
-import printability
+import distortion.distortion as d
+import total_variation.total_variation as tv
+import printability.printability as p
+import sklearn.cluster
 
 path_model = 'C:\\Users\\alexi\\PROJET_3A\\Projet Adversarial Patch\\Project Adverserial Patch\\Collision Avoidance\\best_model_extended.pth'
 path_dataset = 'C:\\Users\\alexi\\PROJET_3A\\Projet Adversarial Patch\\Project Adverserial Patch\\Collision Avoidance\\dataset'
 path_calibration = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\calibration\\'
-path_printable_vals = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\printable_vals.dat'
+path_distortion = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\distortion\\distortion.so'
+path_printable_vals = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\printability\\printable_vals.dat'
 
 def tensor_to_numpy_array(tensor):
     tensor = torch.squeeze(tensor)
     array = tensor.detach().cpu().numpy()
-    return np.transpose(array, (1, 2, 0))
+    if (len(array.shape)==3):
+        return np.transpose(array, (1, 2, 0))
+    return array
 
 class ImageTransformationTestCase(unittest.TestCase):
     def setUp(self):
-        self.patch_trainer = new_patch.PatchTrainer(path_model, path_dataset, path_calibration, distort=True)
+        self.patch_trainer = new_patch.PatchTrainer(path_model, 
+                                                    path_dataset, 
+                                                    path_calibration,
+                                                    path_printable_vals, 
+                                                    distort=True)
         
     def test_normalization(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
@@ -35,7 +43,7 @@ class ImageTransformationTestCase(unittest.TestCase):
             plt.close()
             break
 
-    def test_distorsion(self):
+    def test_distortion(self):
         _, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
         for row0 in range(0, new_patch.image_dim - self.patch_trainer.patch_dim, 10):
             for col0 in range(0, new_patch.image_dim - self.patch_trainer.patch_dim, 10):
@@ -46,19 +54,19 @@ class ImageTransformationTestCase(unittest.TestCase):
                 ax1.imshow(tensor_to_numpy_array(empty_with_patch), interpolation='nearest')
                 ax1.set_title('empty image patch')
 
-                empty_with_patch_distorded, map = self.patch_trainer.distorsion_tool.distort(empty_with_patch)
+                empty_with_patch_distorded, map = self.patch_trainer.distortion_tool.distort(empty_with_patch)
                 ax2.imshow(tensor_to_numpy_array(empty_with_patch_distorded), interpolation='nearest')
-                ax2.set_title('after distorsion')
+                ax2.set_title('after distortion')
                 
-                empty_with_patch = self.patch_trainer.distorsion_tool.undistort(empty_with_patch_distorded, map, empty_with_patch)
+                empty_with_patch = self.patch_trainer.distortion_tool.undistort(empty_with_patch_distorded, map, empty_with_patch)
                 ax3.imshow(tensor_to_numpy_array(empty_with_patch), interpolation='nearest')
-                ax3.set_title('after undistorsion')
+                ax3.set_title('after undistortion')
 
-                empty_with_patch_distorded = self.patch_trainer.distorsion_tool.distort_with_map(empty_with_patch, map)
+                empty_with_patch_distorded = self.patch_trainer.distortion_tool.distort_with_map(empty_with_patch, map)
                 ax4.imshow(tensor_to_numpy_array(empty_with_patch_distorded), interpolation='nearest')
                 ax4.set_title('with map')
                 
-                plt.pause(0.05)
+                plt.pause(5)
         plt.show()
         plt.close()
 
@@ -86,7 +94,7 @@ class PatchTestCase(unittest.TestCase):
     def test_mask(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
         empty_with_patch, row0, col0 = self.patch_trainer.random_transform()
-        empty_with_patch_distorded, map = distorsion.distort_patch(self.patch_trainer.cdistort, self.patch_trainer.cam_mtx, 
+        empty_with_patch_distorded, map = d.distort_patch(self.patch_trainer.cdistort, self.patch_trainer.cam_mtx, 
                                                                    self.patch_trainer.dist_coefs, empty_with_patch)
         mask = self.patch_trainer.get_mask(empty_with_patch_distorded)
         
@@ -107,7 +115,7 @@ class VariousTestCase(unittest.TestCase):
     def test_total_variation(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
         for _ in range(100):
-            tv_loss, patch_tv_grad = total_variation.total_variation(self.patch_trainer.patch)
+            tv_loss, patch_tv_grad = tv.total_variation(self.patch_trainer.patch)
             print(patch_tv_grad.shape)
             ax1.imshow(tensor_to_numpy_array(self.patch_trainer.patch), interpolation='nearest')
             ax1.set_title('patch tv loss : %f' % tv_loss)
@@ -115,7 +123,7 @@ class VariousTestCase(unittest.TestCase):
             ax2.imshow(tensor_to_numpy_array(patch_tv_grad), interpolation='nearest')
             ax2.set_title('total variation grad')
 
-            self.patch_trainer.patch -= 0.5 * patch_tv_grad
+            self.patch_trainer.patch -= 0.005 * patch_tv_grad
 
             plt.pause(0.5)
 
@@ -144,7 +152,7 @@ class VariousTestCase(unittest.TestCase):
         _, (ax1, ax2, ax3) = plt.subplots(1, 3)
         im = torch.rand(1, 3, 3, 3)
 
-        print_tool = printability.PrintabilityTool(path_printable_vals, 3)
+        print_tool = p.PrintabilityTool(path_printable_vals, 3)
         colors = print_tool.colors[:, :, 0, 0]
         colors = colors.reshape(5, 6, 3)
 
@@ -166,28 +174,40 @@ class VariousTestCase(unittest.TestCase):
 
         plt.show()
         plt.close()
-        
-    def test_rotation(self):
-        import rotation, math
+    
+    def test_kMeans(self):
+        weights = torch.ones(1, 3, 40, 40)
+        kmeans = sklearn.cluster.KMeans(n_clusters = 5)
         _, (ax1, ax2, ax3) = plt.subplots(1, 3)
-        rotation_tool = rotation.RotationTool()
-        for i in range(50):
-            rad = math.radians(i)
-            im = torch.zeros(1, 3, 224, 224)
-            im[0, :, 50:100, 50:100] = torch.ones(50, 50)
-            ax1.imshow(tensor_to_numpy_array(im), interpolation='nearest')
-            ax1.set_title('before rotation')
-            rot, mat = rotation_tool.rotate(im, 0, rad, 0)
-            ax2.imshow(tensor_to_numpy_array(rot), interpolation='nearest')
-            ax2.set_title('rotation')
-            
-            im = rotation_tool.undo_rotate(rot, mat)
-            
-            ax3.imshow(tensor_to_numpy_array(im), interpolation='nearest')
-            ax3.set_title('undo rotation')
-            plt.pause(0.5)
+
+        self.patch_trainer.model.eval()
+        for image, true_label in self.patch_trainer.train_loader :
+            var_image = torch.autograd.Variable(image, requires_grad=True)
+            vector_scores = self.patch_trainer.model(var_image)
+            model_label = torch.argmax(vector_scores.data).item()
+            if model_label is not true_label.item() or model_label is \
+                    self.patch_trainer.target_class  :
+                continue
+            loss_target = -torch.nn.functional.log_softmax(vector_scores, 
+                                                           dim=1)[0, model_label]
+            loss_target.backward()
+            grad = var_image.grad.clone()
+            ax1.imshow(tensor_to_numpy_array(image))
+            output = torch.nn.functional.conv2d(torch.abs(grad), weights)
+            output = torch.squeeze(output).numpy()
+            ax2.imshow(output)
+            output = np.abs(output)
+            output = output/np.max(output)
+            output = np.where(output < 0.5, 0, 1)
+            ax3.imshow(output)
+            X  = np.transpose(output.nonzero())
+            kmeans.fit(X)
+            r = ax3.scatter(kmeans.cluster_centers_[:, 1],
+                        kmeans.cluster_centers_[:, 0])
+            plt.pause(5)
+            r.remove()
         plt.show()
-        plt.close()
+        plt.close() 
 
 class GradientCheckTestCase(unittest.TestCase):
     def setUp(self):
@@ -216,14 +236,14 @@ class GradientCheckTestCase(unittest.TestCase):
                 for c in range(3):
                     el_cpy = el.copy()
                     el_cpy[0, c, i, j] = e * np.ones((1, 1))
-                    f1, _ = total_variation.total_variation(self.patch_trainer.ctotal_variation, 
+                    f1, _ = tv.total_variation(self.patch_trainer.ctotal_variation, 
                                                             self.patch_trainer.patch + el_cpy)
-                    f2, _ = total_variation.total_variation(self.patch_trainer.ctotal_variation, 
+                    f2, _ = tv.total_variation(self.patch_trainer.ctotal_variation, 
                                                             self.patch_trainer.patch - el_cpy)
                     deltaf = (1/(2*e)) * (f1 - f2)
                     num_grad[0, c, i, j] = deltaf
         ax1.imshow(tensor_to_numpy_array(num_grad), interpolation='nearest')
-        _, grad = total_variation.total_variation(self.patch_trainer.ctotal_variation, 
+        _, grad = tv.total_variation(self.patch_trainer.ctotal_variation, 
                                                      self.patch_trainer.patch)
         ax2.imshow(tensor_to_numpy_array(grad), interpolation='nearest')
         ax3.imshow(tensor_to_numpy_array(grad - num_grad), interpolation='nearest')
