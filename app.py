@@ -14,7 +14,7 @@ QApplication.setAttribute(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 def except_hook(cls, exception, traceback):
     sys.__excepthook__(cls, exception, traceback)
 
-def tensor_to_numpy_array(tensor):
+def tensor_to_array(tensor):
     tensor = torch.squeeze(tensor)
     array = tensor.cpu().numpy()
     return np.transpose(array, (1, 2, 0))
@@ -47,15 +47,16 @@ class PatchWidget(QWidget):
         vbox = QVBoxLayout()
         
         figure = Figure()
+        figure.subplots_adjust(bottom=0, top=1, left=0, right=1)
         canvas = FigureCanvas(figure)
         ax = figure.subplots()
         ax.set_axis_off()
-        ax.imshow(tensor_to_numpy_array(patch_trainer.patch))
-        canvas.draw()
-        window.tabs.currentChanged.connect(lambda : canvas.setFixedSize(
-            self.frameGeometry().width()//5, self.frameGeometry().width()//5))
+        ax.imshow(tensor_to_array(patch_trainer.patch))
+        
+        window.tab_widget.currentChanged.connect(lambda : canvas.setFixedSize(
+            self.frameGeometry().width()//8, self.frameGeometry().width()//8))
         window.resized.connect(lambda : canvas.setFixedSize(
-            self.frameGeometry().width()//5, self.frameGeometry().width()//5))
+            self.frameGeometry().width()//8, self.frameGeometry().width()//8))
         
         vbox.addWidget(canvas)
         
@@ -64,51 +65,50 @@ class PatchWidget(QWidget):
         for attr in attributes :
             name, val = attr.get_tuple(patch_trainer)
             h = QHBoxLayout()
-            h.addWidget(QLabel(name))
+            h.addWidget(QLabel(name), 2)
             widget = QLineEdit()
+            widget.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             widget.setText(str(val))             
             widget.setReadOnly(True)
             widgets.append(widget)
-            h.addWidget(widget)
+            h.addWidget(widget, 3)
             vbox.addLayout(h)
 
         vbox_plot = QVBoxLayout()
-        l = QLabel("Success rate on test dataset : %.2f%%" % patch_trainer.test_success_rate)
-        l.setStyleSheet("font-weight: bold")
-        vbox_plot.addWidget(l)
-
-        for e in patch_trainer.target_proba_train.keys() :
-            plot = pg.PlotWidget(title="epoch %d" % e)
-            plot.getPlotItem().setMenuEnabled(False)
-            plot.getViewBox().setMouseEnabled(False, False)
-            plot.getPlotItem().addLegend()
-            plot.getPlotItem().getAxis("bottom").setLabel("images")
-            plot.getPlotItem().getAxis("left").setLabel("% target proba")
-            plot.getPlotItem().getViewBox().setYRange(0, 1)
-            
-            color = random_color()
-            plot.plot(range(len(patch_trainer.target_proba_train[e])), 
-                            patch_trainer.target_proba_train[e], 
+        if patch_trainer.validation :
+            for e in patch_trainer.target_proba_test.keys() :
+                color = random_color()
+                plot = self.create_plot_item("test epoch %d success rate : %.2f%%" 
+                                                % (e, patch_trainer.success_rate_test[e]))
+                plot.plot(range(len(patch_trainer.target_proba_test[e])), 
+                            patch_trainer.target_proba_test[e], 
                             pen=pg.mkPen(color = color, width = 2), 
-                            name="epoch : %d" % e)
+                            name="test epoch : %d" % e)
+                vbox_plot.addWidget(plot)
+        if not patch_trainer.validation :
+            plot = self.create_plot_item("test success rate : %.2f%%" 
+                                         % patch_trainer.success_rate_test[e])
+            plot.plot(range(len(patch_trainer.target_proba_test[-1])), 
+                            patch_trainer.target_proba_test[-1], 
+                            pen=pg.mkPen(color = color, width = 2), 
+                            name="test")
             vbox_plot.addWidget(plot)
 
-        plot = pg.PlotWidget(title="test")
+
+        hbox.addLayout(vbox, 1)
+        hbox.addLayout(vbox_plot, 3)
+        
+        self.setLayout(hbox)
+        
+    def create_plot_item(self, title):
+        plot = pg.PlotWidget(title=title)
         plot.getPlotItem().setMenuEnabled(False)
         plot.getViewBox().setMouseEnabled(False, False)
         plot.getPlotItem().addLegend()
         plot.getPlotItem().getAxis("bottom").setLabel("images")
         plot.getPlotItem().getAxis("left").setLabel("% target proba")
         plot.getPlotItem().getViewBox().setYRange(0, 1)
-        plot.plot(range(len(patch_trainer.target_proba_test)), 
-                            patch_trainer.target_proba_test, 
-                            pen=pg.mkPen(color = (255, 0, 0), width = 2))
-        vbox_plot.addWidget(plot)
-
-        hbox.addLayout(vbox, 2)
-        hbox.addLayout(vbox_plot, 3)
-        self.setLayout(hbox)
-    
+        return plot
         
 class MainWindow(QMainWindow):
     class ThreadAlive(Exception):
@@ -120,31 +120,33 @@ class MainWindow(QMainWindow):
         self.attributes = (Attribute("date"),
                             Attribute("path_model"),
                             Attribute("path_dataset"),
-                            Attribute("path_calibration"),
                             Attribute("n_classes"),
                             Attribute("target_class"),
                             Attribute("patch_relative_size"),
-                            Attribute("lambda_tv"),
-                            Attribute("lambda_print"),
                             Attribute("distort"),
                             Attribute("n_epochs"),
+                            Attribute("mode"),
+                            Attribute("lambda_target"),
+                            Attribute("lambda_flee"),
+                            Attribute("lambda_tv"),
+                            Attribute("lambda_print"),
                             Attribute("threshold"),
                             Attribute("max_iterations"))
         
         self.setWindowTitle("Patch Viewer")
         file_menu = self.menuBar().addMenu("File")
         
-        file_act = QAction("Open Patch", self)
-        file_act.triggered.connect(self.open_patch)
-        file_menu.addAction(file_act)
+        file_action = QAction("Open Patch", self)
+        file_action.triggered.connect(self.open_patch)
+        file_menu.addAction(file_action)
         
-        self.tabs = QTabWidget()
-        self.tabs.tabBar().setCursor(Qt.PointingHandCursor)
-        self.tabs.setTabPosition(QTabWidget.North)
-        self.tabs.setTabsClosable(True)
-        self.tabs.tabCloseRequested.connect(lambda i : self.tabs.removeTab(i))
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabPosition(QTabWidget.North)
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(lambda i : 
+            self.tab_widget.removeTab(i))
         
-        self.setCentralWidget(self.tabs)
+        self.setCentralWidget(self.tab_widget)
         
         center(self)
 
@@ -157,7 +159,10 @@ class MainWindow(QMainWindow):
         for filename in filenames :
             patch_trainer = pickle.load(open(filename, "rb"))
             widget = PatchWidget(self, patch_trainer, self.attributes)
-            self.tabs.addTab(widget, filename)
+            scroll_area = QScrollArea()
+            scroll_area.setWidget(widget)
+            scroll_area.setWidgetResizable(True)
+            self.tab_widget.addTab(scroll_area, filename)
 
 if __name__ == "__main__" :
     sys.excepthook = except_hook

@@ -174,6 +174,14 @@ if __name__=="__main__" :
     path_img = "C:\\Users\\alexi\\PROJET_3A\\projet_3A\\calibration\\images_distortion\\6f6f2002-682a-11ed-a72e-4a433b536649.jpg"
     undistort(matrix, distortion, path_img, fisheye=False)
     """
+    """
     mtx, dist = look_for_best(path)
-    np.savetxt('camera_matrix2.txt', mtx, fmt='%f')
-    np.savetxt('distortion_coefficients2.txt', dist, fmt='%f')
+    np.savetxt('camera_matrix.txt', mtx, fmt='%f')
+    np.savetxt('distortion_coefficients.txt', dist, fmt='%f')
+    """
+    res = calibrate(path, (6, 9), show=False, fisheye=False)
+    if res is not None :
+        points_2d, points_3d, matrix, distortion, rvecs, tvecs = res
+        error = reprojection_error(points_2d, points_3d, matrix, distortion, rvecs, tvecs, fisheye=False)
+        print(error)
+        print(distortion)

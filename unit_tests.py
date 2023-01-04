@@ -26,7 +26,9 @@ class ImageTransformationTestCase(unittest.TestCase):
         self.patch_trainer = new_patch.PatchTrainer(path_model, 
                                                     path_dataset, 
                                                     path_calibration,
+                                                    path_distortion,
                                                     path_printable_vals, 
+                                                    mode=1,
                                                     distort=True)
         
     def test_normalization(self):
@@ -45,9 +47,9 @@ class ImageTransformationTestCase(unittest.TestCase):
 
     def test_distortion(self):
         _, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
-        for row0 in range(0, new_patch.image_dim - self.patch_trainer.patch_dim, 10):
-            for col0 in range(0, new_patch.image_dim - self.patch_trainer.patch_dim, 10):
-                empty_with_patch = torch.zeros(1, 3, new_patch.image_dim, new_patch.image_dim)
+        for row0 in range(0, new_patch.IMAGE_DIM - self.patch_trainer.patch_dim, 10):
+            for col0 in range(0, new_patch.IMAGE_DIM - self.patch_trainer.patch_dim, 10):
+                empty_with_patch = torch.zeros(1, 3, new_patch.IMAGE_DIM, new_patch.IMAGE_DIM)
                 empty_with_patch[0, :, row0:row0 + self.patch_trainer.patch_dim, 
                                  col0:col0 + self.patch_trainer.patch_dim] = self.patch_trainer.patch
 
@@ -66,7 +68,7 @@ class ImageTransformationTestCase(unittest.TestCase):
                 ax4.imshow(tensor_to_numpy_array(empty_with_patch_distorded), interpolation='nearest')
                 ax4.set_title('with map')
                 
-                plt.pause(5)
+                plt.pause(0.5)
         plt.show()
         plt.close()
 
@@ -109,14 +111,18 @@ class PatchTestCase(unittest.TestCase):
 
 class VariousTestCase(unittest.TestCase):
     def setUp(self):
-        self.patch_trainer = new_patch.PatchTrainer(path_model, path_dataset, path_calibration, 
-                                                    path_printable_vals, distort=True)
+        self.patch_trainer = new_patch.PatchTrainer(path_model, 
+                                                    path_dataset, 
+                                                    path_calibration,
+                                                    path_distortion,
+                                                    path_printable_vals, 
+                                                    mode=1,
+                                                    distort=True)
 
     def test_total_variation(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
         for _ in range(100):
             tv_loss, patch_tv_grad = tv.total_variation(self.patch_trainer.patch)
-            print(patch_tv_grad.shape)
             ax1.imshow(tensor_to_numpy_array(self.patch_trainer.patch), interpolation='nearest')
             ax1.set_title('patch tv loss : %f' % tv_loss)
             
@@ -156,9 +162,9 @@ class VariousTestCase(unittest.TestCase):
         colors = print_tool.colors[:, :, 0, 0]
         colors = colors.reshape(5, 6, 3)
 
-        e = 0.001
+        e = 0.00075
 
-        for i in range(500):
+        for i in range(5000):
             loss, grad = print_tool.score(im)
             im -= e * grad
             print('iteration %d : loss %f' % (i, loss))
@@ -182,8 +188,8 @@ class VariousTestCase(unittest.TestCase):
 
         self.patch_trainer.model.eval()
         for image, true_label in self.patch_trainer.train_loader :
-            var_image = torch.autograd.Variable(image, requires_grad=True)
-            vector_scores = self.patch_trainer.model(var_image)
+            image.requires_grad=True
+            vector_scores = self.patch_trainer.model(image)
             model_label = torch.argmax(vector_scores.data).item()
             if model_label is not true_label.item() or model_label is \
                     self.patch_trainer.target_class  :
@@ -191,14 +197,14 @@ class VariousTestCase(unittest.TestCase):
             loss_target = -torch.nn.functional.log_softmax(vector_scores, 
                                                            dim=1)[0, model_label]
             loss_target.backward()
-            grad = var_image.grad.clone()
+            image.requires_grad=False
             ax1.imshow(tensor_to_numpy_array(image))
-            output = torch.nn.functional.conv2d(torch.abs(grad), weights)
+            output = torch.nn.functional.conv2d(torch.abs(image.grad), weights)
             output = torch.squeeze(output).numpy()
             ax2.imshow(output)
             output = np.abs(output)
             output = output/np.max(output)
-            output = np.where(output < 0.5, 0, 1)
+            output = np.where(output < 0.3, 0, 1)
             ax3.imshow(output)
             X  = np.transpose(output.nonzero())
             kmeans.fit(X)

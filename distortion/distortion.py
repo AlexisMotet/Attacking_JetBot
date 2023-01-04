@@ -46,8 +46,8 @@ class DistortionTool():
                         np.ctypeslib.ndpointer(ctypes.c_uint32, flags="C_CONTIGUOUS"),
                         np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS")]
 
-        cam_mtx = np.loadtxt(path_calibration + 'camera_matrix2.txt', dtype=float)
-        dist_coefs = np.loadtxt(path_calibration + 'distortion_coefficients2.txt', dtype=float)
+        cam_mtx = np.loadtxt(path_calibration + 'camera_matrix.txt', dtype=float)
+        dist_coefs = np.loadtxt(path_calibration + 'distortion_coefficients.txt', dtype=float)
     
         self.mtx = CamMtx()
         self.mtx.fx, self.mtx.fy, self.mtx.cx, self.mtx.cy = cam_mtx[0][0], cam_mtx[1][1], \
