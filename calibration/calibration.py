@@ -1,4 +1,3 @@
-
 # https://www.geeksforgeeks.org/camera-calibration-with-python-opencv/
 
 # Import required modules
@@ -39,51 +38,50 @@ using a circular grid.
 """
 show = False
 
+
 def reprojection_error(points_2d, points_3d, mtx, dist, rvecs, tvecs, fisheye):
     mean_error = 0
-    if fisheye :
+    if fisheye:
         points_3d = np.expand_dims(np.asarray(points_3d), -2)
     for i in range(len(points_3d)):
-        if fisheye :
-            points_2d_projected, _ = cv2.fisheye.projectPoints(points_3d[i], 
-                                                   rvecs[i], 
-                                                   tvecs[i], 
-                                                   mtx, dist)
-        else : 
-            points_2d_projected, _ = cv2.projectPoints(points_3d[i], 
-                                                   rvecs[i], 
-                                                   tvecs[i], 
-                                                   mtx, dist)
-        error = cv2.norm(points_2d[i], points_2d_projected, 
-                         cv2.NORM_L2)/len(points_2d_projected)
+        if fisheye:
+            points_2d_projected, _ = cv2.fisheye.projectPoints(points_3d[i],
+                                                               rvecs[i],
+                                                               tvecs[i],
+                                                               mtx, dist)
+        else:
+            points_2d_projected, _ = cv2.projectPoints(points_3d[i],
+                                                       rvecs[i],
+                                                       tvecs[i],
+                                                       mtx, dist)
+        error = cv2.norm(points_2d[i], points_2d_projected,
+                         cv2.NORM_L2) / len(points_2d_projected)
         mean_error += error
-    print("total error: %f" % (mean_error/len(points_3d)))
-    return mean_error/len(points_3d)
-    
+    print("total error: %f" % (mean_error / len(points_3d)))
+    return mean_error / len(points_3d)
+
 
 def calibrate(path, chessboard, show, fisheye):
     # Define the dimensions of chessboard
     assert type(chessboard) == tuple
-    CHESSBOARD = chessboard
-    
+
     # stop the iteration when specified
     # accuracy, epsilon, is reached or
     # specified number of iterations are completed.
     criteria = (cv2.TERM_CRITERIA_EPS +
                 cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    
-    
+
     # Vector for 3D points
     points_3d = []
-    
+
     # Vector for 2D points
     points_2d = []
-    
+
     # 3D points real world coordinates
-    point_3d = np.zeros((CHESSBOARD[0] * CHESSBOARD[1],3), 
-                          np.float32)
-    point_3d[:, :2] = np.mgrid[0:CHESSBOARD[0],
-                                   0:CHESSBOARD[1]].T.reshape(-1, 2)
+    point_3d = np.zeros((chessboard[0] * chessboard[1], 3),
+                        np.float32)
+    point_3d[:, :2] = np.mgrid[0:chessboard[0],
+                      0:chessboard[1]].T.reshape(-1, 2)
 
     # Extracting path of individual image stored
     # in a given directory. Since no path is
@@ -93,20 +91,20 @@ def calibrate(path, chessboard, show, fisheye):
     for filename in images:
         image = cv2.imread(path + filename)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
+
         # Find the chess board corners
         # If desired number of corners are
         # found in the image then ret = true
         ret, corners = cv2.findChessboardCorners(
-                        gray, CHESSBOARD,
-                        cv2.CALIB_CB_ADAPTIVE_THRESH
-                        + cv2.CALIB_CB_FAST_CHECK 
-                        + cv2.CALIB_CB_NORMALIZE_IMAGE)
-    
+            gray, chessboard,
+            cv2.CALIB_CB_ADAPTIVE_THRESH
+            + cv2.CALIB_CB_FAST_CHECK
+            + cv2.CALIB_CB_NORMALIZE_IMAGE)
+
         # If desired number of corners can be detected then,
         # refine the pixel coordinates and display
         # them on the images of chess board
-        if not ret :
+        if not ret:
             continue
         points_3d.append(point_3d)
 
@@ -117,71 +115,69 @@ def calibrate(path, chessboard, show, fisheye):
 
         points_2d.append(corners)
 
-        if show : 
+        if show:
             # Draw and display the corners
-            image = cv2.drawChessboardCorners(image,
-                                            CHESSBOARD,
-                                            corners, ret)
+            image = cv2.drawChessboardCorners(image, chessboard,
+                                              corners, ret)
             cv2.imshow('img', image)
             cv2.waitKey(0)
-    if show :
+    if show:
         cv2.destroyAllWindows()
-    if len(points_3d) == 0 :
+    if len(points_3d) == 0:
         return None
-    if fisheye :
+    if fisheye:
         points_3d_ = np.expand_dims(np.asarray(points_3d), -2)
         _, matrix, distortion, rvecs, tvecs = cv2.fisheye.calibrate(
             points_3d_, points_2d, gray.shape[::-1], None, None)
-    else :
+    else:
         _, matrix, distortion, rvecs, tvecs = cv2.calibrateCamera(
             points_3d, points_2d, gray.shape[::-1], None, None)
-    
-    return points_2d, points_3d, matrix, distortion, rvecs, tvecs  
- 
+
+    return points_2d, points_3d, matrix, distortion, rvecs, tvecs
+
+
 def undistort(mtx, dist, path_img, fisheye):
     img = cv2.imread(path_img)
     h, w = img.shape[:2]
-    if fisheye :
+    if fisheye:
         map1, map2 = cv2.fisheye.initUndistortRectifyMap(mtx, dist, None, mtx, (h, w), cv2.CV_16SC2)
-    else :
+    else:
         map1, map2 = cv2.initUndistortRectifyMap(mtx, dist, None, mtx, (h, w), cv2.CV_16SC2)
     undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
     cv2.imshow("undistorted", undistorted_img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-    
+
+
 def look_for_best(path):
     min_error = 1e3
     best_matrix, best_distortion = None, None
     for i in range(3, 10):
         for j in range(3, 10):
             res = calibrate(path, (i, j), show=False, fisheye=False)
-            if res is not None :
+            if res is not None:
                 points_2d, points_3d, matrix, distortion, rvecs, tvecs = res
                 error = reprojection_error(points_2d, points_3d, matrix, distortion, rvecs, tvecs, fisheye=False)
-                if (error is not None and error < min_error) :
+                if error is not None and error < min_error:
                     best_matrix, best_distortion, min_error = matrix, distortion, error
     print("min error : %f" % min_error)
-    return  best_matrix, best_distortion
-    
-            
-if __name__=="__main__" :
+    return best_matrix, best_distortion
+
+"""
+if __name__ == "__main__":
     path = "calibration\\images_calibration\\"
-    """
     points_2d, points_3d, matrix, distortion, rvecs, tvecs = calibrate(path, (6, 6), show=False, fisheye=False)
     reprojection_error(points_2d, points_3d, matrix, distortion, 
                        rvecs, tvecs, fisheye=False)
     path_img = "C:\\Users\\alexi\\PROJET_3A\\projet_3A\\calibration\\images_distortion\\6f6f2002-682a-11ed-a72e-4a433b536649.jpg"
     undistort(matrix, distortion, path_img, fisheye=False)
-    """
-    """
     mtx, dist = look_for_best(path)
     np.savetxt('camera_matrix.txt', mtx, fmt='%f')
     np.savetxt('distortion_coefficients.txt', dist, fmt='%f')
-    """
     res = calibrate(path, (6, 9), show=False, fisheye=False)
-    if res is not None :
+    if res is not None:
         points_2d, points_3d, matrix, distortion, rvecs, tvecs = res
         error = reprojection_error(points_2d, points_3d, matrix, distortion, rvecs, tvecs, fisheye=False)
         print(error)
         print(distortion)
+"""

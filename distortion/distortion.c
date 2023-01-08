@@ -20,7 +20,7 @@ typedef struct dist_coefs
 } dist_coefs;
 
 void cdistort(const float * image, const size_t row, const size_t col, const cam_mtx * mtx,
-          const dist_coefs * coefs, unsigned *map, float * image_distorded) 
+          const dist_coefs * coefs, unsigned *map, float * image_distorted) 
 {
     size_t x, y, c;
     float nx, ny, r2, ndx_f, ndy_f;
@@ -45,7 +45,7 @@ void cdistort(const float * image, const size_t row, const size_t col, const cam
                 i = dx + dy * col;    
                 for (c = 0; c < 3; c++)
                 {   
-                    image_distorded[i + c * row * col] = image[i_v + c * row * col];
+                    image_distorted[i + c * row * col] = image[i_v + c * row * col];
                 }
                 map[i] = i_v;
             }
@@ -54,7 +54,7 @@ void cdistort(const float * image, const size_t row, const size_t col, const cam
 }
 
 void cdistort_with_map(const float * image, const size_t row, const size_t col,
-                       const unsigned *map, float * image_distorded)
+                       const unsigned *map, float * image_distorted)
 {
     int x, y, c;
     int i, i_v;
@@ -66,13 +66,13 @@ void cdistort_with_map(const float * image, const size_t row, const size_t col,
             i_v = map[x + y * col];
             for (c = 0; c < 3; c++)
             {
-                image_distorded[i + c * row * col] = image[i_v + c * row * col];
+                image_distorted[i + c * row * col] = image[i_v + c * row * col];
             }
         }
     }
 }
 
-void cundistort(const float * image_distorded, const size_t row, const size_t col,
+void cundistort(const float * image_distorted, const size_t row, const size_t col,
                 const unsigned *map, float * image)
 {
     int x, y, c;
@@ -85,7 +85,7 @@ void cundistort(const float * image_distorded, const size_t row, const size_t co
             i_v = map[x + y * col];
             for (c = 0; c < 3; c++)
             {
-                image[i_v + c * row * col] = image_distorded[i + c * row * col];
+                image[i_v + c * row * col] = image_distorted[i + c * row * col];
             }
         }
     }

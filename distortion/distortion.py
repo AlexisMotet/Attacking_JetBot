@@ -2,13 +2,15 @@ import ctypes
 import numpy as np
 import torch
 
+
 class CamMtx(ctypes.Structure):
-        _fields_ = [
-            ("fx", ctypes.c_float),
-            ("fy", ctypes.c_float),
-            ("cx", ctypes.c_float),
-            ("cy", ctypes.c_float),
-            ]
+    _fields_ = [
+        ("fx", ctypes.c_float),
+        ("fy", ctypes.c_float),
+        ("cx", ctypes.c_float),
+        ("cy", ctypes.c_float),
+    ]
+
 
 class DistCoefs(ctypes.Structure):
     _fields_ = [
@@ -17,63 +19,66 @@ class DistCoefs(ctypes.Structure):
         ("k3", ctypes.c_float),
     ]
 
+
 class DistortionTool():
-    def __init__(self, path_calibration, path_distortion) :
+    def __init__(self, path_calibration, path_distortion):
         lib = ctypes.cdll.LoadLibrary(path_distortion)
-        self.cdistort = lib.cdistort
-        self.cdistort.restype = None
-        self.cdistort.argtypes = [np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-                        ctypes.c_size_t,
-                        ctypes.c_size_t,
-                        ctypes.POINTER(CamMtx),
-                        ctypes.POINTER(DistCoefs),
-                        np.ctypeslib.ndpointer(ctypes.c_uint32, flags="C_CONTIGUOUS"),
-                        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS")]
+        self.c_distort = lib.cdistort
+        self.c_distort.restype = None
+        self.c_distort.argtypes = [np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+                                   ctypes.c_size_t,
+                                   ctypes.c_size_t,
+                                   ctypes.POINTER(CamMtx),
+                                   ctypes.POINTER(DistCoefs),
+                                   np.ctypeslib.ndpointer(ctypes.c_uint32, flags="C_CONTIGUOUS"),
+                                   np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS")]
 
-        self.cdistort_with_map = lib.cdistort_with_map
-        self.cdistort_with_map.restype = None
-        self.cdistort_with_map.argtypes = [np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-                        ctypes.c_size_t,
-                        ctypes.c_size_t,
-                        np.ctypeslib.ndpointer(ctypes.c_uint32, flags="C_CONTIGUOUS"),
-                        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS")]
+        self.c_distort_with_map = lib.cdistort_with_map
+        self.c_distort_with_map.restype = None
+        self.c_distort_with_map.argtypes = [np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+                                            ctypes.c_size_t,
+                                            ctypes.c_size_t,
+                                            np.ctypeslib.ndpointer(ctypes.c_uint32, flags="C_CONTIGUOUS"),
+                                            np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS")]
 
-        self.cundistort = lib.cundistort
-        self.cundistort.restype = None
-        self.cundistort.argtypes = [np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
-                        ctypes.c_size_t,
-                        ctypes.c_size_t,
-                        np.ctypeslib.ndpointer(ctypes.c_uint32, flags="C_CONTIGUOUS"),
-                        np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS")]
+        self.c_undistort = lib.cundistort
+        self.c_undistort.restype = None
+        self.c_undistort.argtypes = [np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
+                                     ctypes.c_size_t,
+                                     ctypes.c_size_t,
+                                     np.ctypeslib.ndpointer(ctypes.c_uint32, flags="C_CONTIGUOUS"),
+                                     np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS")]
 
         cam_mtx = np.loadtxt(path_calibration + 'camera_matrix.txt', dtype=float)
         dist_coefs = np.loadtxt(path_calibration + 'distortion_coefficients.txt', dtype=float)
-    
+
         self.mtx = CamMtx()
         self.mtx.fx, self.mtx.fy, self.mtx.cx, self.mtx.cy = cam_mtx[0][0], cam_mtx[1][1], \
                                                              cam_mtx[0][2], cam_mtx[1][2]
         self.coefs = DistCoefs()
         self.coefs.k1, self.coefs.k2, self.coefs.k3 = dist_coefs[0], dist_coefs[1], dist_coefs[4]
-    
+
     def distort(self, image):
-        image = image.numpy()
-        image_distorded = np.zeros_like(image, dtype=np.single)
-        row, col = image.shape[2],  image.shape[3]
-        map = np.zeros((row, col), dtype=np.uint32)
-        self.cdistort(image, row, col, self.mtx, self.coefs, map, 
-                      image_distorded)
-        return torch.tensor(image_distorded), map
+        image = image.detach().numpy()
+        image_distorted = np.zeros_like(image)
+        row, col = image.shape[2], image.shape[3]
+        map_ = np.zeros((row, col), dtype=np.uint32)
+        self.c_distort(image, row, col, self.mtx, self.coefs, map_,
+                       image_distorted)
+        return torch.from_numpy(image_distorted), map_
 
-    def distort_with_map(self, image, map):
-        image_distorded = np.zeros_like(image)
-        row, col = image.shape[2],  image.shape[3]
-        self.cdistort_with_map(image.numpy(), row, col, map, image_distorded)
-        return torch.tensor(image_distorded)
+    def distort_with_map(self, image, map_):
+        image = image.detach().numpy()
+        image_distorted = np.zeros_like(image)
+        row, col = image.shape[2], image.shape[3]
+        self.c_distort_with_map(image, row, col, map_, image_distorted)
+        return torch.from_numpy(image_distorted)
 
-    def undistort(self, image_distorded, map, image):
-        row, col = image.shape[2],  image.shape[3]
-        self.cundistort(image_distorded.numpy(), row, col, map, image.numpy())
+    def undistort(self, image_distorted, map_, image):
+        row, col = image.shape[2], image.shape[3]
+        self.c_undistort(image_distorted.detach().numpy(), row, col, map_, image.detach().numpy())
         return image
+
 
 """
 if __name__=="__main__" :
@@ -99,10 +104,10 @@ if __name__=="__main__" :
     t1 = time.time()
 
     ax1.imshow(tensor_to_numpy_array(empty_with_patch), interpolation='nearest')
-    empty_with_patch_distorded, map = distort_patch(cdistort, mtx, coefs, empty_with_patch)
-    ax2.imshow(tensor_to_numpy_array(empty_with_patch_distorded), interpolation='nearest')
+    empty_with_patch_distorted, map = distort_patch(cdistort, mtx, coefs, empty_with_patch)
+    ax2.imshow(tensor_to_numpy_array(empty_with_patch_distorted), interpolation='nearest')
 
-    empty_with_patch = undistort_patch(cundistort, empty_with_patch_distorded, map, empty_with_patch)
+    empty_with_patch = undistort_patch(cundistort, empty_with_patch_distorted, map, empty_with_patch)
     ax3.imshow(tensor_to_numpy_array(empty_with_patch), interpolation='nearest')
     
     t2 = time.time()
@@ -111,10 +116,10 @@ if __name__=="__main__" :
     cam_mtx, dist_coefs = calibration.distortion.load_coef(path_calibration)
     print(empty_with_patch.shape)
     t1 = time.time()
-    empty_with_patch_distorded, map_ = calibration.distortion.distort_patch(cam_mtx, dist_coefs, empty_with_patch)
-    ax4.imshow(tensor_to_numpy_array(empty_with_patch_distorded), interpolation='nearest')
+    empty_with_patch_distorted, map_ = calibration.distortion.distort_patch(cam_mtx, dist_coefs, empty_with_patch)
+    ax4.imshow(tensor_to_numpy_array(empty_with_patch_distorted), interpolation='nearest')
 
-    empty_with_patch = calibration.distortion.undistort_patch(empty_with_patch, empty_with_patch_distorded, map_)
+    empty_with_patch = calibration.distortion.undistort_patch(empty_with_patch, empty_with_patch_distorted, map_)
     ax5.imshow(tensor_to_numpy_array(empty_with_patch), interpolation='nearest')
     t2 = time.time()
     print(t2 - t1)
