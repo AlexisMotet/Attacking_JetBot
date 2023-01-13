@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 
-
 class PrintabilityModule(torch.nn.Module):
     def __init__(self, path_printable_colors, image_dim):
         super(PrintabilityModule, self).__init__()

@@ -1,6 +1,4 @@
 import torch
-import numpy as np
-torch.autograd.set_detect_anomaly(True)
 
 class TotalVariationModule(torch.nn.Module):
     def __init__(self):

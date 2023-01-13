@@ -126,8 +126,7 @@ class MainWindow(QMainWindow):
                             Attribute("distort"),
                             Attribute("n_epochs"),
                             Attribute("mode"),
-                            Attribute("lambda_target"),
-                            Attribute("lambda_flee"),
+                            Attribute("random_mode"),
                             Attribute("lambda_tv"),
                             Attribute("lambda_print"),
                             Attribute("threshold"),
@@ -143,8 +142,7 @@ class MainWindow(QMainWindow):
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabPosition(QTabWidget.North)
         self.tab_widget.setTabsClosable(True)
-        self.tab_widget.tabCloseRequested.connect(lambda i : 
-            self.tab_widget.removeTab(i))
+        self.tab_widget.tabCloseRequested.connect(lambda i : self.tab_widget.removeTab(i))
         
         self.setCentralWidget(self.tab_widget)
         

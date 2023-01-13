@@ -49,7 +49,8 @@ class PatchTrainer():
         self.normalize = torchvision.transforms.Normalize(mean=consts.MEAN, std=consts.STD)
 
         if self.distort:
-            self.distortion_tool = distortion.DistortionTool(self.path_calibration, self.path_distortion)
+            self.distortion_tool = distortion.DistortionTool(self.path_calibration, 
+                                                             self.path_distortion)
 
         self.tv_module = total_variation.TotalVariationModule()
 
@@ -96,7 +97,7 @@ class PatchTrainer():
         X = np.transpose(binary.nonzero())
         self.kMeans.fit(X)
         row, col = self.kMeans.cluster_centers_[np.random.randint(
-            len(self.kMeans.cluster_centers_))]
+                                                len(self.kMeans.cluster_centers_))]
         row0 = int(max(row - self.patch_dim / 2, 0))
         col0 = int(max(col - self.patch_dim / 2, 0))
         return row0, col0
@@ -109,10 +110,10 @@ class PatchTrainer():
         c = 0
 
         empty_with_patch = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
-        empty_with_patch[0, :, row0:row0 + self.patch_dim, 
+        empty_with_patch[:, :, row0:row0 + self.patch_dim, 
                                col0:col0 + self.patch_dim] = self.patch
         mask = self.get_mask(empty_with_patch)
-        while True:
+        for c in range(self.max_iterations + 1) :
             adversarial_image = torch.mul(1 - mask, image) + torch.mul(mask, empty_with_patch)
             adversarial_image.requires_grad = True
             normalized = self.normalize(adversarial_image)
@@ -121,8 +122,8 @@ class PatchTrainer():
             target_proba = vector_proba[0, self.target_class].item()
             if c > 0:
                 print('iteration : %d target proba : %f' % (c, target_proba))
-            c += 1
-            if target_proba >= self.threshold or c > self.max_iterations:
+             
+            if target_proba >= self.threshold:
                 break
                     
             loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
@@ -141,19 +142,14 @@ class PatchTrainer():
                 empty_with_patch -= target_grad - adversarial_image.grad
 
             if self.lambda_tv > 0 or self.lambda_print > 0 :
-                
                 self.patch.requires_grad = True
-
                 if self.lambda_tv > 0 :
-
                     loss = self.tv_module(self.patch)
                     loss.backward()
                     tv_grad = self.patch.grad.clone()
 
                     self.patch.grad.zero_()
-                
                 if self.lambda_print > 0 :
-
                     loss = self.printability_module(self.patch)
                     loss.backward()
                     print_grad = self.patch.grad.clone()
@@ -171,23 +167,24 @@ class PatchTrainer():
                                        col0:col0 + self.patch_dim] = self.patch
 
             del loss
-            if self.lambda_tv == 0 and self.lambda_print ==  0 :
-                self.patch = empty_with_patch[:, :, row0:row0 + self.patch_dim, 
-                                                    col0:col0 + self.patch_dim]
+        if self.lambda_tv == 0 and self.lambda_print ==  0 :
+            self.patch = empty_with_patch[:, :, row0:row0 + self.patch_dim, 
+                                                col0:col0 + self.patch_dim]
         return normalized, empty_with_patch
 
     def attack_with_distortion(self, image, row0, col0):
         c = 0
 
         empty_with_patch = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
-        empty_with_patch[0, :, row0:row0 + self.patch_dim,
+        empty_with_patch[:, :, row0:row0 + self.patch_dim,
                                col0:col0 + self.patch_dim] = self.patch
 
         empty_with_patch_distorted, map_ = self.distortion_tool.distort(empty_with_patch)
         mask = self.get_mask(empty_with_patch_distorted)
 
-        while True:
-            adversarial_image = torch.mul(1 - mask, image) + torch.mul(mask, empty_with_patch_distorted)
+        for c in range(self.max_iterations + 1) :
+            adversarial_image = torch.mul(1 - mask, image) + torch.mul(mask, 
+                                                                       empty_with_patch_distorted)
             adversarial_image.requires_grad = True
             normalized = self.normalize(adversarial_image)
             vector_scores = self.model(normalized)
@@ -195,31 +192,28 @@ class PatchTrainer():
             target_proba = vector_proba[0, self.target_class].item()
             if c > 0:
                 print('iteration : %d target proba : %f' % (c, target_proba))
-            c += 1
-            if target_proba >= self.threshold or c > self.max_iterations:
+            if target_proba >= self.threshold:
                 break
 
             loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
             if self.mode == consts.Mode.TARGET :
                 loss[0, self.target_class].backward()
-                empty_with_patch -= adversarial_image.grad
+                empty_with_patch_distorted -= adversarial_image.grad
             elif self.mode == consts.Mode.FLEE:
                 loss[0, self.class_to_flee].backward()
-                empty_with_patch -= adversarial_image.grad
+                empty_with_patch_distorted -= adversarial_image.grad
             else :
                 loss[0, self.target_class].backward(retain_graph=True)
                 target_grad = adversarial_image.grad.clone()
                 adversarial_image.grad.zero_()
                 loss[0, self.class_to_flee].backward()
-                empty_with_patch -= target_grad - adversarial_image.grad
+                empty_with_patch_distorted -= target_grad - adversarial_image.grad
 
             
             if self.lambda_tv > 0 or self.lambda_print > 0 :
-                
                 self.patch.requires_grad = True
 
                 if self.lambda_tv > 0 :
-
                     loss = self.tv_module(self.patch)
                     loss.backward()
                     tv_grad = self.patch.grad.clone()
@@ -227,7 +221,6 @@ class PatchTrainer():
                     self.patch.grad.zero_()
                 
                 if self.lambda_print > 0 :
-
                     loss = self.printability_module(self.patch)
                     loss.backward()
                     print_grad = self.patch.grad.clone()
@@ -243,9 +236,10 @@ class PatchTrainer():
                 self.patch -= self.lambda_tv * tv_grad + self.lambda_print * print_grad
 
                 empty_with_patch = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
-                empty_with_patch[0, :, row0:row0 + self.patch_dim, 
+                empty_with_patch[:, :, row0:row0 + self.patch_dim, 
                                        col0:col0 + self.patch_dim] = self.patch
-                empty_with_patch_distorted = self.distortion_tool.distort_with_map(empty_with_patch, map_)
+                empty_with_patch_distorted = self.distortion_tool.distort_with_map(empty_with_patch, 
+                                                                                   map_)
 
             del loss
         
@@ -256,7 +250,7 @@ class PatchTrainer():
                                                 col0:col0 + self.patch_dim]
         return normalized, empty_with_patch
 
-    def test(self, epoch):
+    def test(self, epoch=-1):
         self.target_proba_test[epoch] = []
         total, success = 0, 0
         for image, true_label in self.test_loader:
@@ -278,7 +272,7 @@ class PatchTrainer():
                 row0, col0 = self.random_transform()
 
             empty_with_patch = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
-            empty_with_patch[0, :, row0:row0 + self.patch_dim, 
+            empty_with_patch[:, :, row0:row0 + self.patch_dim, 
                                    col0:col0 + self.patch_dim] = self.patch
 
             if self.distort:
@@ -290,8 +284,8 @@ class PatchTrainer():
                 mask = self.get_mask(empty_with_patch)
                 adversarial_image = torch.mul(1 - mask, image) + torch.mul(mask, empty_with_patch)
 
-            adversarial_image = self.normalize(adversarial_image)
-            vector_scores = self.model(adversarial_image)
+            normalized = self.normalize(adversarial_image)
+            vector_scores = self.model(normalized)
             adversarial_label = torch.argmax(vector_scores).item()
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
             target_proba = vector_proba[0, self.target_class].item()
@@ -299,7 +293,7 @@ class PatchTrainer():
                 success += 1
 
             if total % consts.N_ENREG_IMG == 0:
-                torchvision.utils.save_image(adversarial_image, consts.PATH_IMG_FOLDER
+                torchvision.utils.save_image(normalized, consts.PATH_IMG_FOLDER
                                              + 'test_epoch%d_target_proba%.2f_label%d.png'
                                              % (epoch, target_proba, adversarial_label))
                 plt.imshow(u.tensor_to_array(image))
@@ -318,7 +312,7 @@ class PatchTrainer():
                 break
         self.success_rate_test[epoch] = 100 * (success / float(total))
 
-    def train_and_test(self):
+    def train(self):
         self.model.eval()
         for epoch in range(self.n_epochs):
             n = 0
@@ -375,13 +369,11 @@ class PatchTrainer():
                                     bbox_inches='tight')
                         r.remove()
 
-                if consts.LIMIT_TRAIN_LEN is not None and n >= consts.LIMIT_TRAIN_LEN :
+                if consts.LIMIT_TRAIN_EPOCH_LEN is not None and n >= consts.LIMIT_TRAIN_EPOCH_LEN :
                     break
 
             if self.validation:
                 self.test(epoch)
-        if not self.validation:
-            self.test(-1)
         plt.clf()
         return None
 
