@@ -69,7 +69,7 @@ class PatchTrainer():
     def random_patch_init(self):
         patch = torch.empty(1, 3, self.patch_dim, self.patch_dim)
         for i, (m, s) in enumerate(zip(consts.MEAN, consts.STD)):
-            patch[:, i, :, :].normal_(mean=m, std=s)
+            patch[0, i, :, :].normal_(mean=m, std=s)
         return patch
 
     def test_model(self):
@@ -110,7 +110,7 @@ class PatchTrainer():
         c = 0
 
         empty_with_patch = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
-        empty_with_patch[:, :, row0:row0 + self.patch_dim, 
+        empty_with_patch[0, :, row0:row0 + self.patch_dim, 
                                col0:col0 + self.patch_dim] = self.patch
         mask = self.get_mask(empty_with_patch)
         for c in range(self.max_iterations + 1) :
@@ -133,7 +133,7 @@ class PatchTrainer():
                 empty_with_patch -= adversarial_image.grad
             elif self.mode == consts.Mode.FLEE:
                 loss[0, self.class_to_flee].backward()
-                empty_with_patch -= adversarial_image.grad
+                empty_with_patch += adversarial_image.grad
             else :
                 loss[0, self.target_class].backward(retain_graph=True)
                 target_grad = adversarial_image.grad.clone()
@@ -158,7 +158,7 @@ class PatchTrainer():
 
                 self.patch.requires_grad = False
 
-                self.patch = empty_with_patch[:, :, row0:row0 + self.patch_dim, 
+                self.patch = empty_with_patch[0, :, row0:row0 + self.patch_dim, 
                                                     col0:col0 + self.patch_dim]
 
                 self.patch -= self.lambda_tv * tv_grad + self.lambda_print * print_grad
@@ -168,7 +168,7 @@ class PatchTrainer():
 
             del loss
         if self.lambda_tv == 0 and self.lambda_print ==  0 :
-            self.patch = empty_with_patch[:, :, row0:row0 + self.patch_dim, 
+            self.patch = empty_with_patch[0, :, row0:row0 + self.patch_dim, 
                                                 col0:col0 + self.patch_dim]
         return normalized, empty_with_patch
 
@@ -176,7 +176,7 @@ class PatchTrainer():
         c = 0
 
         empty_with_patch = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
-        empty_with_patch[:, :, row0:row0 + self.patch_dim,
+        empty_with_patch[0, :, row0:row0 + self.patch_dim,
                                col0:col0 + self.patch_dim] = self.patch
 
         empty_with_patch_distorted, map_ = self.distortion_tool.distort(empty_with_patch)
@@ -231,12 +231,12 @@ class PatchTrainer():
 
                 empty_with_patch = self.distortion_tool.undistort(empty_with_patch_distorted, map_,
                                                                   empty_with_patch)
-                self.patch = empty_with_patch[:, :, row0:row0 + self.patch_dim, 
+                self.patch = empty_with_patch[0, :, row0:row0 + self.patch_dim, 
                                                     col0:col0 + self.patch_dim]
                 self.patch -= self.lambda_tv * tv_grad + self.lambda_print * print_grad
 
                 empty_with_patch = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
-                empty_with_patch[:, :, row0:row0 + self.patch_dim, 
+                empty_with_patch[0, :, row0:row0 + self.patch_dim, 
                                        col0:col0 + self.patch_dim] = self.patch
                 empty_with_patch_distorted = self.distortion_tool.distort_with_map(empty_with_patch, 
                                                                                    map_)
@@ -246,7 +246,7 @@ class PatchTrainer():
         if self.lambda_tv == 0 and self.lambda_print ==  0 :
             empty_with_patch = self.distortion_tool.undistort(empty_with_patch_distorted, map_,
                                                               empty_with_patch)
-            self.patch = empty_with_patch[:, :, row0:row0 + self.patch_dim, 
+            self.patch = empty_with_patch[0, :, row0:row0 + self.patch_dim, 
                                                 col0:col0 + self.patch_dim]
         return normalized, empty_with_patch
 
@@ -272,7 +272,7 @@ class PatchTrainer():
                 row0, col0 = self.random_transform()
 
             empty_with_patch = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
-            empty_with_patch[:, :, row0:row0 + self.patch_dim, 
+            empty_with_patch[0, :, row0:row0 + self.patch_dim, 
                                    col0:col0 + self.patch_dim] = self.patch
 
             if self.distort:
@@ -386,3 +386,39 @@ class PatchTrainer():
         self.kMeans = None
         pickle.dump(self, open(path, "wb"))
 
+if __name__=="__main__" :
+    import PIL
+    _, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
+    image = PIL.Image.open("C:\\Users\\alexi\\PROJET_3A\\imagenette2-160\\train\\n01440764\\n01440764_17174.JPEG")
+    transform = torchvision.transforms.Compose([torchvision.transforms.Resize(256),
+                                                torchvision.transforms.CenterCrop(224),
+                                                torchvision.transforms.ToTensor(),])
+    image = transform(image)
+    image = image[None, :]
+    
+    path_model = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\new_imagenette2-160_model.pth'
+    path_dataset = 'C:\\Users\\alexi\\PROJET_3A\\imagenette2-160\\train\\'
+    path_calibration = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\calibration\\'
+    path_distortion = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\distortion\\distortion.so'
+    path_printable_colors = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\printability\\printable_colors.dat'
+        
+    patch_trainer = PatchTrainer(path_model, path_dataset, path_calibration, path_distortion, 
+                                 path_printable_colors, patch_relative_size=0.05)
+    
+    ax1.imshow(u.tensor_to_array(image), interpolation='nearest')
+    ax1.set_title('image')
+    
+    row0, col0 = 30, 30
+    adversarial_image, empty_with_patch = patch_trainer.attack(image, row0, col0)
+    
+    ax2.imshow(u.tensor_to_array(empty_with_patch), interpolation='nearest')
+    ax2.set_title('empty with image')
+    
+    ax3.imshow(u.tensor_to_array(adversarial_image), interpolation='nearest')
+    ax3.set_title('adversarial image')
+    
+    ax4.imshow(u.tensor_to_array(patch_trainer.patch), interpolation='nearest')
+    ax4.set_title('patch')
+    
+    plt.show()
+    plt.close()
