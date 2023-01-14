@@ -40,6 +40,7 @@ class PatchTrainer():
         self.max_iterations = max_iterations
 
         self.model = u.load_model(self.path_model, n_classes=self.n_classes)
+        self.model.eval()
         self.train_loader, self.test_loader = u.load_dataset(self.path_dataset)
 
         image_size = consts.IMAGE_DIM ** 2
@@ -127,9 +128,10 @@ class PatchTrainer():
                 break
                     
             loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
-            
+            print(loss)
             if self.mode == consts.Mode.TARGET :
                 loss[0, self.target_class].backward()
+                if (c==0) : print(adversarial_image.grad)
                 empty_with_patch -= adversarial_image.grad
             elif self.mode == consts.Mode.FLEE:
                 loss[0, self.class_to_flee].backward()
@@ -313,7 +315,6 @@ class PatchTrainer():
         self.success_rate_test[epoch] = 100 * (success / float(total))
 
     def train(self):
-        self.model.eval()
         for epoch in range(self.n_epochs):
             n = 0
             for image, true_label in self.train_loader:
@@ -404,6 +405,8 @@ if __name__=="__main__" :
         
     patch_trainer = PatchTrainer(path_model, path_dataset, path_calibration, path_distortion, 
                                  path_printable_colors, patch_relative_size=0.05)
+    
+    patch_trainer.patch = torch.ones(1, 3, patch_trainer.patch_dim, patch_trainer.patch_dim)
     
     ax1.imshow(u.tensor_to_array(image), interpolation='nearest')
     ax1.set_title('image')
