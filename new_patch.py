@@ -405,6 +405,11 @@ if __name__=="__main__" :
         
     patch_trainer = PatchTrainer(path_model, path_dataset, path_calibration, path_distortion, 
                                  path_printable_colors, patch_relative_size=0.05)
+
+    import mnew_patch
+    
+    mpatch_trainer = mnew_patch.MPatchTrainer(path_model, path_dataset, path_calibration, 
+                                              path_printable_colors, patch_relative_size=0.05)
     
     patch_trainer.patch = torch.ones(1, 3, patch_trainer.patch_dim, patch_trainer.patch_dim)
     
