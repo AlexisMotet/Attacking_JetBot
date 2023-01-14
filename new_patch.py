@@ -114,7 +114,7 @@ class PatchTrainer():
         empty_with_patch[0, :, row0:row0 + self.patch_dim, 
                                col0:col0 + self.patch_dim] = self.patch
         mask = self.get_mask(empty_with_patch)
-        for c in range(self.max_iterations + 1) :
+        while True :
             adversarial_image = torch.mul(1 - mask, image) + torch.mul(mask, empty_with_patch)
             adversarial_image.requires_grad = True
             normalized = self.normalize(adversarial_image)
@@ -123,15 +123,13 @@ class PatchTrainer():
             target_proba = vector_proba[0, self.target_class].item()
             if c > 0:
                 print('iteration : %d target proba : %f' % (c, target_proba))
-             
-            if target_proba >= self.threshold:
+            c += 1
+            if target_proba >= self.threshold or c > self.max_iterations :
                 break
                     
             loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
-            print(loss)
             if self.mode == consts.Mode.TARGET :
                 loss[0, self.target_class].backward()
-                if (c==0) : print(adversarial_image.grad)
                 empty_with_patch -= adversarial_image.grad
             elif self.mode == consts.Mode.FLEE:
                 loss[0, self.class_to_flee].backward()
@@ -157,7 +155,6 @@ class PatchTrainer():
                     print_grad = self.patch.grad.clone()
 
                     self.patch.grad.zero_()
-
                 self.patch.requires_grad = False
 
                 self.patch = empty_with_patch[0, :, row0:row0 + self.patch_dim, 
@@ -203,7 +200,7 @@ class PatchTrainer():
                 empty_with_patch_distorted -= adversarial_image.grad
             elif self.mode == consts.Mode.FLEE:
                 loss[0, self.class_to_flee].backward()
-                empty_with_patch_distorted -= adversarial_image.grad
+                empty_with_patch_distorted += adversarial_image.grad
             else :
                 loss[0, self.target_class].backward(retain_graph=True)
                 target_grad = adversarial_image.grad.clone()
@@ -387,15 +384,11 @@ class PatchTrainer():
         self.kMeans = None
         pickle.dump(self, open(path, "wb"))
 
+
+
 if __name__=="__main__" :
     import PIL
-    _, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
-    image = PIL.Image.open("C:\\Users\\alexi\\PROJET_3A\\imagenette2-160\\train\\n01440764\\n01440764_17174.JPEG")
-    transform = torchvision.transforms.Compose([torchvision.transforms.Resize(256),
-                                                torchvision.transforms.CenterCrop(224),
-                                                torchvision.transforms.ToTensor(),])
-    image = transform(image)
-    image = image[None, :]
+    _, (ax1, ax2, ax3, ax4,ax5, ax6, ax7) = plt.subplots(1, 7)
     
     path_model = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\new_imagenette2-160_model.pth'
     path_dataset = 'C:\\Users\\alexi\\PROJET_3A\\imagenette2-160\\train\\'
@@ -404,29 +397,49 @@ if __name__=="__main__" :
     path_printable_colors = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\printability\\printable_colors.dat'
         
     patch_trainer = PatchTrainer(path_model, path_dataset, path_calibration, path_distortion, 
-                                 path_printable_colors, patch_relative_size=0.05)
+                                 path_printable_colors, patch_relative_size=0.05, validation=False)
 
     import mnew_patch
     
     mpatch_trainer = mnew_patch.MPatchTrainer(path_model, path_dataset, path_calibration, 
                                               path_printable_colors, patch_relative_size=0.05)
     
-    patch_trainer.patch = torch.ones(1, 3, patch_trainer.patch_dim, patch_trainer.patch_dim)
+    mpatch_trainer.patch = patch_trainer.patch.detach().clone()
     
-    ax1.imshow(u.tensor_to_array(image), interpolation='nearest')
-    ax1.set_title('image')
-    
-    row0, col0 = 30, 30
-    adversarial_image, empty_with_patch = patch_trainer.attack(image, row0, col0)
-    
-    ax2.imshow(u.tensor_to_array(empty_with_patch), interpolation='nearest')
-    ax2.set_title('empty with image')
-    
-    ax3.imshow(u.tensor_to_array(adversarial_image), interpolation='nearest')
-    ax3.set_title('adversarial image')
-    
-    ax4.imshow(u.tensor_to_array(patch_trainer.patch), interpolation='nearest')
-    ax4.set_title('patch')
-    
+    for image, true_label in patch_trainer.train_loader:
+        vector_scores = patch_trainer.model(image)
+        model_label = torch.argmax(vector_scores).item()
+        if model_label is not true_label.item() or model_label is patch_trainer.target_class:
+            continue
+        
+        row0, col0 = patch_trainer.random_transform()
+
+        adversarial_image, empty_with_patch = patch_trainer.attack(image, row0, col0)
+        _, madversarial_image, mempty_with_patch = mpatch_trainer.image_attack(image, row0, col0)
+        ax1.imshow(u.tensor_to_array(image), interpolation='nearest')
+        ax1.set_title('image')
+        
+        ax2.imshow(u.tensor_to_array(empty_with_patch), interpolation='nearest')
+        ax2.set_title('empty with image')
+        
+        ax3.imshow(u.tensor_to_array(adversarial_image), interpolation='nearest')
+        ax3.set_title('adversarial image')
+        
+        ax4.imshow(u.tensor_to_array(patch_trainer.patch), interpolation='nearest')
+        ax4.set_title('patch')
+        
+        ax5.imshow(u.tensor_to_array(mempty_with_patch), interpolation='nearest')
+        ax5.set_title('empty with image')
+        
+        ax6.imshow(u.tensor_to_array(madversarial_image), interpolation='nearest')
+        ax6.set_title('adversarial image')
+        
+        ax7.imshow(u.tensor_to_array(mpatch_trainer.patch), interpolation='nearest')
+        ax7.set_title('patch')
+        plt.pause(1)
+        
+        # print(torch.equal(adversarial_image, madversarial_image))
+        # print(torch.equal(empty_with_patch, mempty_with_patch))
+    patch_trainer.test(-1)
     plt.show()
     plt.close()
