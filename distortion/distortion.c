@@ -19,8 +19,9 @@ typedef struct dist_coefs
     float k3;
 } dist_coefs;
 
-void cdistort(const float * image, const size_t row, const size_t col, const cam_mtx * mtx,
-          const dist_coefs * coefs, unsigned *map, float * image_distorted) 
+void cdistort(const float * image, const size_t row, const size_t col, 
+              const cam_mtx * mtx, const dist_coefs * coefs, unsigned *map, 
+              float * image_distorted) 
 {
     size_t x, y, c;
     float nx, ny, r2, ndx_f, ndy_f;

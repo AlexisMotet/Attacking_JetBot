@@ -1,5 +1,5 @@
 import sys
-import torch
+import utils.utils as u
 import numpy as np
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -13,11 +13,6 @@ QApplication.setAttribute(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 
 def except_hook(cls, exception, traceback):
     sys.__excepthook__(cls, exception, traceback)
-
-def tensor_to_array(tensor):
-    tensor = torch.squeeze(tensor)
-    array = tensor.cpu().numpy()
-    return np.transpose(array, (1, 2, 0))
 
 def random_color():
     return tuple(np.random.randint(200, 256, size=3))
@@ -51,7 +46,7 @@ class PatchWidget(QWidget):
         canvas = FigureCanvas(figure)
         ax = figure.subplots()
         ax.set_axis_off()
-        ax.imshow(tensor_to_array(patch_trainer.patch))
+        ax.imshow(u.tensor_to_array(patch_trainer.patch))
         
         window.tab_widget.currentChanged.connect(lambda : canvas.setFixedSize(
             self.frameGeometry().width()//8, self.frameGeometry().width()//8))
@@ -75,25 +70,22 @@ class PatchWidget(QWidget):
             vbox.addLayout(h)
 
         vbox_plot = QVBoxLayout()
-        if patch_trainer.validation :
-            for e in patch_trainer.target_proba_test.keys() :
-                color = random_color()
-                plot = self.create_plot_item("test epoch %d success rate : %.2f%%" 
-                                                % (e, patch_trainer.success_rate_test[e]))
-                plot.plot(range(len(patch_trainer.target_proba_test[e])), 
-                            patch_trainer.target_proba_test[e], 
-                            pen=pg.mkPen(color = color, width = 2), 
-                            name="test epoch : %d" % e)
-                vbox_plot.addWidget(plot)
         if not patch_trainer.validation :
-            plot = self.create_plot_item("test success rate : %.2f%%" 
-                                         % patch_trainer.success_rate_test[e])
-            plot.plot(range(len(patch_trainer.target_proba_test[-1])), 
-                            patch_trainer.target_proba_test[-1], 
-                            pen=pg.mkPen(color = color, width = 2), 
-                            name="test")
+            vbox_plot.addWidget(QLabel("Success rate %.2f%%"
+                                       % patch_trainer.success_rate_test[-1]))
+        for e in patch_trainer.target_proba_train.keys() :
+            color = random_color()
+            if patch_trainer.validation :
+                plot = self.create_plot_item("Train epoch %d - "
+                                             "Validation success rate : %.2f%%" % 
+                                             (e, patch_trainer.success_rate_test[e]))
+            else :
+                plot = self.create_plot_item("Train epoch %d" % e)
+            plot.plot(range(len(patch_trainer.target_proba_train[e])), 
+                        patch_trainer.target_proba_train[e], 
+                        pen=pg.mkPen(color = color, width = 2), 
+                        name="train epoch : %d" % e)
             vbox_plot.addWidget(plot)
-
 
         hbox.addLayout(vbox, 1)
         hbox.addLayout(vbox_plot, 3)

@@ -18,7 +18,6 @@ def load_dataset(path_dataset):
     dataset = torchvision.datasets.ImageFolder(
         path_dataset,
         torchvision.transforms.Compose([
-            # torchvision.transforms.ColorJitter(0.1, 0.1, 0.1, 0.1),
             torchvision.transforms.RandomHorizontalFlip(),
             torchvision.transforms.Resize(consts.RESIZE_DIM),
             torchvision.transforms.CenterCrop(consts.IMAGE_DIM),
@@ -28,7 +27,8 @@ def load_dataset(path_dataset):
 
     n_train = int(consts.RATIO_TRAIN_TEST * len(dataset))
     n_test = len(dataset) - n_train
-    train_dataset, test_dataset = torch.utils.data.random_split(dataset, [n_train, n_test])
+    train_dataset, test_dataset = torch.utils.data.random_split(dataset, 
+                                                                [n_train, n_test])
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,

@@ -4,8 +4,7 @@ import numpy as np
 class PrintabilityModule(torch.nn.Module):
     def __init__(self, path_printable_colors, image_dim):
         super(PrintabilityModule, self).__init__()
-        self.colors = torch.nn.Parameter(self.get_colors(path_printable_colors, image_dim),
-                                                         requires_grad=False)
+        self.colors = self.get_colors(path_printable_colors, image_dim)
     
     def forward(self, image):
         delta = image - self.colors[:, np.newaxis, :, :, :]

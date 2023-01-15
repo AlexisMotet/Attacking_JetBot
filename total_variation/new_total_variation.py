@@ -1,12 +1,9 @@
 import torch
 
 class TotalVariationModule(torch.nn.Module):
-    def __init__(self):
-        super(TotalVariationModule, self).__init__()
-
-    def forward(self, input):
-        tv_row = input[:, :, 1:, :] - input[:, :, :-1, :]
-        tv_col = input[:, :, :, 1:] - input[:, :, :, :-1]
+    def forward(self, image):
+        tv_row = image[:, :, 1:, :] - image[:, :, :-1, :]
+        tv_col = image[:, :, :, 1:] - image[:, :, :, :-1]
 
         sqrt = torch.sqrt(tv_row[:, :, :, :-1] ** 2 + tv_col[:, :, :-1, :] ** 2 + 1e-5)
 
