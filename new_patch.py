@@ -13,25 +13,21 @@ import utils.utils as u
 import constants.constants as consts
 
 class PatchTrainer():
-    def __init__(self, path_model, path_dataset, path_calibration, path_distortion,
-                 path_printable_colors, mode=consts.Mode.TARGET, 
-                 random_mode=consts.RandomMode.FULL_RANDOM, validation=True, 
-                 n_classes=10,  target_class=2, patch_relative_size=0.05, 
-                 distort=False, n_epochs=2, lambda_tv=0, 
+    def __init__(self, mode=consts.Mode.TARGET, random_mode=consts.RandomMode.FULL_RANDOM, 
+                 validation=True, n_classes=10,  target_class=2, patch_relative_size=0.05, 
+                 jitter=False, distort=False, n_epochs=2, lambda_tv=0, 
                  lambda_print=0, threshold=0.9, max_iterations=10):
 
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        self.path_model = path_model
-        self.path_dataset = path_dataset
-        self.path_calibration = path_calibration
-        self.path_distortion = path_distortion
-        self.path_printable_colors = path_printable_colors
+        self.path_model = consts.PATH_MODEL
+        self.path_dataset = consts.PATH_DATASET
         self.mode = mode
         self.random_mode = random_mode
         self.validation = validation
         self.n_classes = n_classes
         self.target_class = target_class
         self.patch_relative_size = patch_relative_size
+        self.jitter = jitter
         self.distort = distort
         self.n_epochs = n_epochs
         self.lambda_tv = lambda_tv
@@ -47,13 +43,17 @@ class PatchTrainer():
         patch_size = image_size * self.patch_relative_size
         self.patch_dim = int(patch_size ** (0.5))
         
-        self.color_jitter_module = color_jitter.ColorJitterModule()
-        self.normalize = torchvision.transforms.Compose([
-                    self.color_jitter_module,
-                    torchvision.transforms.Normalize(mean=consts.MEAN, 
-                                                     std=consts.STD)
-                    ])
-
+        if not self.jitter : 
+            self.normalize = torchvision.transforms.Normalize(mean=consts.MEAN, 
+                                                              std=consts.STD)
+        else :
+            self.color_jitter_module = color_jitter.ColorJitterModule()
+            self.normalize = torchvision.transforms.Compose([
+                            self.color_jitter_module,
+                            torchvision.transforms.Normalize(mean=consts.MEAN, 
+                                                            std=consts.STD)
+                            ])
+ 
         if self.distort:
             self.dist_tool = distortion.DistortionTool(self.path_calibration, 
                                                        self.path_distortion)
@@ -204,7 +204,7 @@ class PatchTrainer():
         for image, true_label in self.test_loader:
             if self.random_mode == consts.RandomMode.TRAIN_TEST_KMEANS :
                 image.requires_grad = True
-            self.color_jitter_module.jitter()
+            if self.jitter : self.color_jitter_module.jitter()
             vector_scores = self.model(self.normalize(image))
             model_label = torch.argmax(vector_scores).item()
             if model_label != true_label.item() :
@@ -276,7 +276,7 @@ class PatchTrainer():
                 if self.random_mode in [consts.RandomMode.TRAIN_KMEANS,
                                         consts.RandomMode.TRAIN_TEST_KMEANS]:
                     image.requires_grad = True
-                self.color_jitter_module.jitter()
+                if self.jitter : self.color_jitter_module.jitter()
                 vector_scores = self.model(self.normalize(image))
                 model_label = torch.argmax(vector_scores).item()
                 if model_label != true_label.item() :

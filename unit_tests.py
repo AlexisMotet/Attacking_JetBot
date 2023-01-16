@@ -8,24 +8,26 @@ import matplotlib.pyplot as plt
 import distortion.distortion as d
 import total_variation.new_total_variation as tv
 import printability.new_printability as p
+import color_jitter.color_jitter as color_jitter
 import utils.utils as u
 import sklearn.cluster
 import PIL
 import torchvision
 
-"""
-path_model = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\imagenette2-160_model.pth'
+
+path_model = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\new_imagenette2-160_model.pth'
 path_dataset = 'U:\\PROJET_3A\\imagenette2-160\\train'
 path_calibration = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\calibration\\'
 path_distortion = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\distortion\\distortion.so'
 path_printable_colors = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\printability\\printable_colors.txt'
-"""
 
+"""
 path_model = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\new_imagenette2-160_model.pth'
 path_dataset = 'C:\\Users\\alexi\\PROJET_3A\\imagenette2-160\\train'
 path_calibration = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\calibration\\'
 path_distortion = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\distortion\\distortion.so'
 path_printable_colors = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\printability\\printable_colors.txt'
+"""
 
 def tensor_to_array(tensor):
     tensor = torch.clamp(tensor, 0, 1)
@@ -33,64 +35,42 @@ def tensor_to_array(tensor):
 
 class ImageTransformation(unittest.TestCase):
     def setUp(self):
-        self.patch_trainer = new_patch.PatchTrainer(path_model,
-                                                    path_dataset,
-                                                    path_calibration,
-                                                    path_distortion,
-                                                    path_printable_colors,
-                                                    distort=True)
+        self.train_loader, _ = u.load_dataset(path_dataset)
+        self.normalize = torchvision.transforms.Normalize(mean=c.MEAN, std=c.STD)
+        self.color_jitter_module = color_jitter.ColorJitterModule()
 
     def test_normalization(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
         plt.suptitle("TEST NORMALIZATION")
-        for img, _ in self.patch_trainer.train_loader:
+        for img, _ in self.train_loader:
             ax1.imshow(tensor_to_array(img), interpolation='nearest')
             ax1.set_title('original image')
 
             t0 = time.time()
-            normalized_img = self.patch_trainer.normalize(img)
+            normalized_img = self.normalize(img)
             t1 = time.time()
             ax2.imshow(tensor_to_array(normalized_img), interpolation='nearest')
             ax2.set_title('normalized image\ndeltat=%.2fms' % ((t1 - t0)*1e3))
 
             plt.pause(1)
         plt.show()
-    def test_distortion(self):
-        plt.suptitle("TEST DISTORTION")
-        _, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
-        trainer = self.patch_trainer
-        patch_dim = trainer.patch_dim
-        for x in range(0, c.IMAGE_DIM - patch_dim, 10):
-            row0, col0 = x, x
-            empty_with_patch = torch.zeros(1, 3, c.IMAGE_DIM, 
-                                                 c.IMAGE_DIM)
-            empty_with_patch[0, :, row0:row0 + patch_dim,
-                                    col0:col0 + patch_dim] = trainer.patch
-            
-            ax1.imshow(tensor_to_array(empty_with_patch), interpolation='nearest')
-            ax1.set_title('empty image patch')
+
+    def test_jitter(self):
+        _, (ax1, ax2) = plt.subplots(1, 2)
+        plt.suptitle("TEST JITTER")
+        for img, _ in self.train_loader:
+            ax1.imshow(tensor_to_array(img), interpolation='nearest')
+            ax1.set_title('original image')
 
             t0 = time.time()
-            distorted, map_ = trainer.dist_tool.distort(empty_with_patch)
+            jittered_img = self.color_jitter_module(img)
             t1 = time.time()
-            ax2.imshow(tensor_to_array(distorted), interpolation='nearest')
-            ax2.set_title('after distortion\ndeltat=%.2fms' % ((t1 - t0)*1e3))
-
-            t0 = time.time()
-            empty_with_patch = trainer.dist_tool.undistort(distorted, map_,
-                                                           empty_with_patch)
-            t1 = time.time()
-            ax3.imshow(tensor_to_array(empty_with_patch), interpolation='nearest')
-            ax3.set_title('after undistortion\ndeltat=%.2fms' % ((t1 - t0)*1e3))
-
-            t0 = time.time()
-            distorted = trainer.dist_tool.distort_with_map(empty_with_patch, map_)
-            t1 = time.time()
-            ax4.imshow(tensor_to_array(distorted), 
-                       interpolation='nearest')
-            ax4.set_title('with map\ndeltat=%.2fms' % ((t1 - t0)*1e3))
+            ax2.imshow(tensor_to_array(jittered_img), interpolation='nearest')
+            ax2.set_title('jitter image\ndeltat=%.2fms' % ((t1 - t0)*1e3))
 
             plt.pause(1)
+        plt.show()
+    
         
 class Trainer(unittest.TestCase):
     def setUp(self):
@@ -141,6 +121,44 @@ class Trainer(unittest.TestCase):
             ax2.set_title('mask')
             plt.pause(1)
         plt.show()
+
+    def test_distortion(self):
+        _, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
+        plt.suptitle("TEST DISTORTION")
+        trainer = self.patch_trainer
+        patch_dim = trainer.patch_dim
+        for x in range(0, c.IMAGE_DIM - patch_dim, 10):
+            row0, col0 = x, x
+            empty_with_patch = torch.zeros(1, 3, c.IMAGE_DIM, 
+                                                 c.IMAGE_DIM)
+            empty_with_patch[0, :, row0:row0 + patch_dim,
+                                    col0:col0 + patch_dim] = trainer.patch
+            
+            ax1.imshow(tensor_to_array(empty_with_patch), interpolation='nearest')
+            ax1.set_title('empty image patch')
+
+            t0 = time.time()
+            distorted, map_ = trainer.dist_tool.distort(empty_with_patch)
+            t1 = time.time()
+            ax2.imshow(tensor_to_array(distorted), interpolation='nearest')
+            ax2.set_title('after distortion\ndeltat=%.2fms' % ((t1 - t0)*1e3))
+
+            t0 = time.time()
+            empty_with_patch = trainer.dist_tool.undistort(distorted, map_,
+                                                           empty_with_patch)
+            t1 = time.time()
+            ax3.imshow(tensor_to_array(empty_with_patch), interpolation='nearest')
+            ax3.set_title('after undistortion\ndeltat=%.2fms' % ((t1 - t0)*1e3))
+
+            t0 = time.time()
+            distorted = trainer.dist_tool.distort_with_map(empty_with_patch, map_)
+            t1 = time.time()
+            ax4.imshow(tensor_to_array(distorted), 
+                       interpolation='nearest')
+            ax4.set_title('with map\ndeltat=%.2fms' % ((t1 - t0)*1e3))
+
+            plt.pause(1)
+
     def test_attack(self):
         trainer = self.patch_trainer
         _, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5)
@@ -149,7 +167,7 @@ class Trainer(unittest.TestCase):
             ax1.imshow(tensor_to_array(image), interpolation='nearest')
             ax1.set_title('image')
             vector_scores = trainer.model(trainer.normalize(image))
-            model_label = torch.argmax(vector_scores.data).item()
+            model_label = torch.argmax(vector_scores).item()
             if model_label is not true_label.item() or \
                     model_label is trainer.target_class:
                 continue
@@ -158,13 +176,15 @@ class Trainer(unittest.TestCase):
             empty_with_patch = torch.zeros(1, 3, c.IMAGE_DIM, 
                                                  c.IMAGE_DIM)
             empty_with_patch[0, :, row0:row0 + trainer.patch_dim, 
-                             col0:col0 + trainer.patch_dim] = trainer.patch
+                                   col0:col0 + trainer.patch_dim] = trainer.patch
             mask = trainer.get_mask(empty_with_patch)
             i = 0
+
             while True:
-                attacked = torch.mul(1 - mask, image) + \
-                                    torch.mul(mask, empty_with_patch)
+                t0 = time.time()
+                attacked = torch.mul(1 - mask, image) + torch.mul(mask, empty_with_patch)
                 attacked.requires_grad = True
+                
                 normalized = trainer.normalize(attacked)
                 
                 vector_scores = trainer.model(normalized)
@@ -182,22 +202,26 @@ class Trainer(unittest.TestCase):
                 loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
                 loss[0, trainer.target_class].backward()
                 empty_with_patch -= attacked.grad
-                normalized_grad = u.normalize_tensor(attacked.grad.detach())
+                
+
+                t1 = time.time()
+                normalized_grad = u.normalize_tensor(attacked.grad)
                 ax3.imshow(tensor_to_array(normalized_grad), 
                            interpolation='nearest')
-                ax3.set_title('normalized grad')
+                ax3.set_title('normalized grad\ndeltat=%.2fms' % ((t1 - t0)*1e3))
                 
                 ax4.imshow(tensor_to_array(empty_with_patch), interpolation='nearest')
                 ax4.set_title('empty with patch')
-            
-                trainer.patch = empty_with_patch[0, :, row0:row0 + trainer.patch_dim, 
-                                                       col0:col0 + trainer.patch_dim]
 
+                
                 ax5.imshow(tensor_to_array(trainer.patch), interpolation='nearest')
                 ax5.set_title('patch')
-                plt.pause(1)
+                plt.pause(0.1)
+            trainer.patch = empty_with_patch[0, :, row0:row0 + trainer.patch_dim, 
+                                                   col0:col0 + trainer.patch_dim]
         plt.show()
-                
+
+
     def test_attack_target(self):
         trainer = self.patch_trainer
         _, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
@@ -218,7 +242,7 @@ class Trainer(unittest.TestCase):
             ax1.imshow(tensor_to_array(normalized), interpolation='nearest')
             ax1.set_title("image %d" % n)
             ax2.imshow(tensor_to_array(attacked), interpolation='nearest') 
-            ax2.set_title("attacked\nfirst target proba=%.2f%%" % first_target_proba)
+            ax2.set_title("attacked\nfirst target proba=%.2f" % first_target_proba)
             ax3.imshow(tensor_to_array(empty_with_patch), interpolation='nearest')
             ax3.set_title("empty with patch")        
             ax4.imshow(tensor_to_array(trainer.patch), interpolation='nearest')
@@ -246,7 +270,7 @@ class Trainer(unittest.TestCase):
             ax1.imshow(tensor_to_array(normalized), interpolation='nearest')
             ax1.set_title("image %d" % n)
             ax2.imshow(tensor_to_array(attacked), interpolation='nearest') 
-            ax2.set_title("attacked\nfirst target proba=%.2f%%" % first_target_proba)
+            ax2.set_title("attacked\nfirst target proba=%.2f" % first_target_proba)
             ax3.imshow(tensor_to_array(empty_with_patch), interpolation='nearest')
             ax3.set_title("empty with patch")        
             ax4.imshow(tensor_to_array(trainer.patch), interpolation='nearest')
@@ -275,12 +299,12 @@ class Trainer(unittest.TestCase):
             ax1.imshow(tensor_to_array(normalized), interpolation='nearest')
             ax1.set_title("image %d" % n)
             ax2.imshow(tensor_to_array(attacked), interpolation='nearest') 
-            ax2.set_title("attacked\nfirst target proba=%.2f%%" % first_target_proba)
+            ax2.set_title("attacked\nfirst target proba=%.2f" % first_target_proba)
             ax3.imshow(tensor_to_array(empty_with_patch), interpolation='nearest')
             ax3.set_title("empty with patch")        
             ax4.imshow(tensor_to_array(trainer.patch), interpolation='nearest')
             ax4.set_title("patch")
-            plt.pause(1)
+            plt.pause(0.1)
         plt.show()  
 
     def test_comparaison(self):
@@ -323,7 +347,7 @@ class Trainer(unittest.TestCase):
                     ax1[0].imshow(tensor_to_array(image_flee), interpolation='nearest')
                     ax1[0].set_title("image")
                     ax1[1].imshow(tensor_to_array(normalized), interpolation='nearest') 
-                    ax1[1].set_title("attacked (flee)\ntarget proba=%.2f%%" % target_proba)
+                    ax1[1].set_title("attacked (flee)\ntarget proba=%.2f" % target_proba)
                     ax1[2].imshow(tensor_to_array(empty_with_patch_flee), interpolation='nearest')
                     ax1[2].set_title("empty with patch")        
                     ax1[3].imshow(tensor_to_array(trainer_flee.patch), interpolation='nearest')
@@ -331,7 +355,7 @@ class Trainer(unittest.TestCase):
                     
                     # TARGET
                     attacked = torch.mul(1 - mask, image_target) + \
-                                    torch.mul(mask, empty_with_patch_target)
+                               torch.mul(mask, empty_with_patch_target)
                     attacked.requires_grad = True
                     normalized = trainer.normalize(attacked)
                     vector_scores = trainer.model(normalized)
@@ -348,17 +372,18 @@ class Trainer(unittest.TestCase):
                         loss[0, trainer.target_class].backward()
                         empty_with_patch_target -= attacked.grad
                         trainer.patch = empty_with_patch_target[:, :, row0:row0 + trainer.patch_dim, 
-                                                                    col0:col0 + trainer.patch_dim]
+                                                                      col0:col0 + trainer.patch_dim]
                     ax2[0].imshow(tensor_to_array(image_target), interpolation='nearest')
                     ax2[0].set_title("image")
                     ax2[1].imshow(tensor_to_array(normalized), interpolation='nearest') 
-                    ax2[1].set_title("attacked\ntarget proba=%.2f%%" % target_proba)
+                    ax2[1].set_title("attacked\ntarget proba=%.2f" % target_proba)
                     ax2[2].imshow(tensor_to_array(empty_with_patch_target), interpolation='nearest')
                     ax2[2].set_title("empty with patch")        
                     ax2[3].imshow(tensor_to_array(trainer.patch), interpolation='nearest')
                     ax2[3].set_title("patch")
                     plt.suptitle("iteration %d" % c)
-                    plt.pause(1)
+                    plt.pause(0.1)
+                    
 class Tools(unittest.TestCase):
     def setUp(self):
         self.patch_trainer = new_patch.PatchTrainer(path_model,
