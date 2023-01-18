@@ -8,6 +8,7 @@ import pyqtgraph as pg
 import pickle
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
+import torchvision
 
 QApplication.setAttribute(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 
@@ -27,16 +28,18 @@ class Attribute():
     def get_tuple(self, patch_trainer):
         return (self.name, self.get_attribute(patch_trainer))
 
-def center(w):
-    frame_geo = w.frameGeometry()
+def center(window):
+    frame_geometry = window.frameGeometry()
     screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
     centerPoint = QApplication.desktop().screenGeometry(screen).center()
-    frame_geo.moveCenter(centerPoint)
-    w.move(frame_geo.topLeft())
+    frame_geometry.moveCenter(centerPoint)
+    window.move(frame_geometry.topLeft())
             
 class PatchWidget(QWidget):
     def __init__(self, window, patch_trainer, attributes):
         super().__init__()
+
+        self.patch_trainer = patch_trainer
 
         hbox = QHBoxLayout()
         vbox = QVBoxLayout()
@@ -46,7 +49,7 @@ class PatchWidget(QWidget):
         canvas = FigureCanvas(figure)
         ax = figure.subplots()
         ax.set_axis_off()
-        ax.imshow(u.tensor_to_array(patch_trainer.patch))
+        ax.imshow(np.clip(u.tensor_to_array(patch_trainer.patch), 0, 1))
         
         window.tab_widget.currentChanged.connect(lambda : canvas.setFixedSize(
             self.frameGeometry().width()//8, self.frameGeometry().width()//8))
@@ -54,8 +57,12 @@ class PatchWidget(QWidget):
             self.frameGeometry().width()//8, self.frameGeometry().width()//8))
         
         vbox.addWidget(canvas)
+
+        button = QPushButton("Save Patch as Image")
+        button.clicked.connect(self.save_patch_as_image)
+        button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
+        vbox.addWidget(button)
         
-        widgets = []
         
         for attr in attributes :
             name, val = attr.get_tuple(patch_trainer)
@@ -65,7 +72,6 @@ class PatchWidget(QWidget):
             widget.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             widget.setText(str(val))             
             widget.setReadOnly(True)
-            widgets.append(widget)
             h.addWidget(widget, 3)
             vbox.addLayout(h)
 
@@ -101,6 +107,10 @@ class PatchWidget(QWidget):
         plot.getPlotItem().getAxis("left").setLabel("% target proba")
         plot.getPlotItem().getViewBox().setYRange(0, 1)
         return plot
+
+    def save_patch_as_image(self):
+        filename = QFileDialog.getSaveFileName(filter="*.png")
+        torchvision.utils.save_image(self.patch_trainer.patch, filename[0])
         
 class MainWindow(QMainWindow):
     class ThreadAlive(Exception):
@@ -112,13 +122,15 @@ class MainWindow(QMainWindow):
         self.attributes = (Attribute("date"),
                             Attribute("path_model"),
                             Attribute("path_dataset"),
-                            Attribute("n_classes"),
-                            Attribute("target_class"),
-                            Attribute("patch_relative_size"),
-                            Attribute("distort"),
-                            Attribute("n_epochs"),
+                            Attribute("limit_train_epoch_len"),
+                            Attribute("limit_test_len"),
                             Attribute("mode"),
                             Attribute("random_mode"),
+                            Attribute("target_class"),
+                            Attribute("patch_relative_size"),
+                            Attribute("jitter"),
+                            Attribute("distort"),
+                            Attribute("n_epochs"),
                             Attribute("lambda_tv"),
                             Attribute("lambda_print"),
                             Attribute("threshold"),

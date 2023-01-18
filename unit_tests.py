@@ -389,9 +389,6 @@ class Tools(unittest.TestCase):
     def setUp(self):
         self.patch_trainer = new_patch.PatchTrainer(path_model,
                                                     path_dataset,
-                                                    path_calibration,
-                                                    path_distortion,
-                                                    path_printable_colors,
                                                     distort=True)
         transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(256),
@@ -409,7 +406,7 @@ class Tools(unittest.TestCase):
     
     def test_total_variation(self):
         assert len(self.batch) >= 1
-        e = 0.005
+        e = 0.0001
         tv_module = tv.TotalVariationModule()
         image = self.batch[0]
         image = image[None, :]
