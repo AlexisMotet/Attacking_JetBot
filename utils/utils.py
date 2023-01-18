@@ -50,5 +50,79 @@ def load_model(path_model, n_classes):
     model.load_state_dict(torch.load(path_model, map_location=torch.device('cpu')))
     return model
 
+class Attribute():
+    def __init__(self, name):
+        self.name = name
+    
+    def get_attribute(self, patch_trainer) :
+        return getattr(patch_trainer, self.name)
+    
+    def get_tuple(self, patch_trainer):
+        return (self.name, self.get_attribute(patch_trainer))
+
+class PrettyPrinter():
+    def __init__(self, trainer, notebook=True):
+        self.last_len = None
+        self.saved = None
+        self.trainer = trainer
+        self.attributes = (Attribute("date"),
+                            Attribute("path_model"),
+                            Attribute("path_dataset"),
+                            Attribute("limit_train_epoch_len"),
+                            Attribute("limit_test_len"),
+                            Attribute("target_class"),
+                            Attribute("patch_relative_size"),
+                            Attribute("jitter"),
+                            Attribute("distort"),
+                            Attribute("n_epochs"),
+                            Attribute("mode"),
+                            Attribute("random_mode"),
+                            Attribute("lambda_tv"),
+                            Attribute("lambda_print"),
+                            Attribute("threshold"),
+                            Attribute("max_iterations"))
+
+    def training(self):
+        print("================ TRAINING ================")
+        for i, attribute in enumerate(self.attributes) :
+            name, val = attribute.get_tuple(self.trainer)
+            if i%2 == 0 : txt = "%s=%s" % (name, val)
+            else :
+                txt += " || " + "%s=%s" % (name, val)
+                print(txt)
+        if len(self.attributes) % 2 != 0 : print("%s=%s" % (name, val))
+        print("==========================================")
+        
+    def update_test(self, epoch, success_rate, total):
+        txt = "[TEST] Epoch %02d - Success rate %1.3f%% - Image %03d " % (epoch, success_rate, total)
+        if len(txt) != self.last_len : self.clear()
+        print(txt, end="\r")
+        self.last_len = len(txt)
+
+    def update_image(self, epoch, success_rate, total):
+        self.saved = "[TRAINING] Epoch %02d - Success rate while training %1.3f%% - Image %03d" % (epoch, success_rate, total)
+
+    def update_iteration(self, i, target_proba):
+        assert self.saved
+        txt = "%s - [ATTACK] Gradient descent iteration %03d - Target probability %1.3f" % (self.saved, i, target_proba)
+        if len(txt) != self.last_len : self.clear()
+        print(txt, end="\r")
+        self.last_len = len(txt)
+
+    def clear(self):
+        if self.last_len:
+            spaces = " " * self.last_len
+            print(spaces, end="\r")
+            
+"""
 if __name__ == "__main__":
-    pass
+    import time
+    pretty_printer = PrettyPrinter(None)
+    pretty_printer.training()
+    for i in range(10):
+        pretty_printer.update_image(i,2)
+        for j in range(10):
+            pretty_printer.update_iteration(j)
+            time.sleep(0.4)
+    pretty_printer.test()
+"""

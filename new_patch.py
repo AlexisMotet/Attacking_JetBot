@@ -13,25 +13,24 @@ import utils.utils as u
 import constants.constants as consts
 
 class PatchTrainer():
-    def __init__(self, path_model, path_dataset, path_calibration, path_distortion,
-                 path_printable_colors, mode=consts.Mode.TARGET, 
-                 random_mode=consts.RandomMode.FULL_RANDOM, validation=True, 
-                 n_classes=10,  target_class=2, patch_relative_size=0.05, 
-                 distort=False, n_epochs=2, lambda_tv=0, 
-                 lambda_print=0, threshold=0.9, max_iterations=10):
+    def __init__(self, mode=consts.Mode.TARGET, random_mode=consts.RandomMode.FULL_RANDOM, 
+                 validation=True, n_classes=10,  target_class=2, patch_relative_size=0.05, 
+                 jitter=False, distort=False, n_epochs=2, lambda_tv=0, lambda_print=0, 
+                 threshold=0.9, max_iterations=10):
 
+        self.pretty_printer = u.PrettyPrinter(self, False)
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        self.path_model = path_model
-        self.path_dataset = path_dataset
-        self.path_calibration = path_calibration
-        self.path_distortion = path_distortion
-        self.path_printable_colors = path_printable_colors
+        self.path_model = consts.PATH_MODEL
+        self.path_dataset = consts.PATH_DATASET
+        self.limit_train_epoch_len = consts.LIMIT_TRAIN_EPOCH_LEN
+        self.limit_test_len = consts.LIMIT_TEST_LEN
         self.mode = mode
         self.random_mode = random_mode
         self.validation = validation
         self.n_classes = n_classes
         self.target_class = target_class
         self.patch_relative_size = patch_relative_size
+        self.jitter = jitter
         self.distort = distort
         self.n_epochs = n_epochs
         self.lambda_tv = lambda_tv
@@ -47,20 +46,24 @@ class PatchTrainer():
         patch_size = image_size * self.patch_relative_size
         self.patch_dim = int(patch_size ** (0.5))
         
-        self.color_jitter_module = color_jitter.ColorJitterModule()
-        self.normalize = torchvision.transforms.Compose([
-                    self.color_jitter_module,
-                    torchvision.transforms.Normalize(mean=consts.MEAN, 
-                                                     std=consts.STD)
-                    ])
-
+        if not self.jitter : 
+            self.normalize = torchvision.transforms.Normalize(mean=consts.MEAN, 
+                                                              std=consts.STD)
+        else :
+            self.color_jitter_module = color_jitter.ColorJitterModule()
+            self.normalize = torchvision.transforms.Compose([
+                            self.color_jitter_module,
+                            torchvision.transforms.Normalize(mean=consts.MEAN, 
+                                                            std=consts.STD)
+                            ])
+ 
         if self.distort:
-            self.dist_tool = distortion.DistortionTool(self.path_calibration, 
-                                                       self.path_distortion)
+            self.dist_tool = distortion.DistortionTool(consts.PATH_CALIBRATION, 
+                                                       consts.PATH_DISTORTION)
 
         self.tv_module = total_variation.TotalVariationModule()
 
-        self.print_module = printability.PrintabilityModule(self.path_printable_colors,
+        self.print_module = printability.PrintabilityModule(consts.PATH_PRINTABLE_COLORS,
                                                             self.patch_dim)
 
         self.patch = self.random_patch_init()
@@ -123,7 +126,8 @@ class PatchTrainer():
     
     def attack(self, image, row0, col0):
         empty_with_patch = self.create_empty_with_patch(row0, col0)
-        if not self.distort : mask = self.get_mask(empty_with_patch)
+        if not self.distort : 
+            mask = self.get_mask(empty_with_patch)
         else :
             distorted, map_ = self.dist_tool.distort(empty_with_patch)
             mask = self.get_mask(distorted)
@@ -141,10 +145,10 @@ class PatchTrainer():
             target_proba = vector_proba[0, self.target_class].item()
             
             if i == 0: first_target_proba = target_proba
-            else: print('iteration : %d target proba : %f' % (i, target_proba))
+            else: self.pretty_printer.update_iteration(i, target_proba)
+
             if self.mode in [consts.Mode.TARGET, consts.Mode.TARGET_AND_FLEE]:
-                if target_proba >= self.threshold : break
-                    
+                if target_proba >= self.threshold : break    
             elif self.mode == consts.Mode.FLEE :
                 if target_proba <= self.threshold : break
             else : assert False
@@ -198,18 +202,102 @@ class PatchTrainer():
             
         if not self.distort : return first_target_proba, normalized, empty_with_patch
         else : return first_target_proba, normalized, distorted
-        
+
+    def train(self):
+        self.pretty_printer.training()
+        for epoch in range(self.n_epochs):
+            total, success, success_rate = 0, 0, 0
+            self.target_proba_train[epoch] = []
+            for image, true_label in self.train_loader:
+                if self.random_mode in [consts.RandomMode.TRAIN_KMEANS,
+                                        consts.RandomMode.TRAIN_TEST_KMEANS]:
+                    image.requires_grad = True
+                if self.jitter : 
+                    self.color_jitter_module.jitter()
+                vector_scores = self.model(self.normalize(image))
+                model_label = torch.argmax(vector_scores).item()
+                if model_label != true_label.item() :
+                    continue
+                elif self.mode in [consts.Mode.TARGET, consts.Mode.TARGET_AND_FLEE] and \
+                        model_label == self.target_class:
+                    continue
+                elif self.mode == consts.Mode.FLEE and \
+                        model_label != self.target_class:
+                    continue
+                self.pretty_printer.update_image(epoch, success_rate, total)
+                total += 1
+                
+                if self.random_mode == consts.RandomMode.FULL_RANDOM :
+                    row0, col0 = self.random_position()
+                else :
+                    loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
+                    loss[0, model_label].backward()
+                    row0, col0 = self.find_patch_position(image.grad)
+                    image.requires_grad = False
+
+                ret = self.attack(image, row0, col0)
+                first_target_proba, attacked, empty_with_patch = ret
+                self.target_proba_train[epoch].append(first_target_proba)
+
+                if self.mode in [consts.Mode.TARGET, consts.Mode.TARGET_AND_FLEE] :
+                    if first_target_proba >= self.threshold : success += 1
+                elif self.mode == consts.Mode.FLEE :
+                    if first_target_proba <= self.threshold : success += 1
+
+                success_rate = success/total
+                
+                if total % consts.N_ENREG_IMG == 0:
+                    torchvision.utils.save_image(image, 
+                                                 consts.PATH_IMG_FOLDER + 
+                                                 'epoch%d_image%d_label%d_original.png'
+                                                 % (epoch, total, true_label.item()))
+
+                    torchvision.utils.save_image(empty_with_patch, 
+                                                 consts.PATH_IMG_FOLDER + 
+                                                 'epoch%d_image%d_empty_with_patch.png'
+                                                 % (epoch, total))
+
+                    torchvision.utils.save_image(attacked, 
+                                                 consts.PATH_IMG_FOLDER + 
+                                                 'epoch%d_image%d_attacked.png'
+                                                 % (epoch, total))
+
+                    torchvision.utils.save_image(self.patch, 
+                                                 consts.PATH_IMG_FOLDER + 
+                                                 'epoch%d_image%d_patch.png'
+                                                 % (epoch, total))
+
+                    plt.imshow(u.tensor_to_array(image))
+
+                    if self.random_mode in [consts.RandomMode.TRAIN_KMEANS,
+                                            consts.RandomMode.TRAIN_TEST_KMEANS]:
+                        r = plt.scatter(self.kMeans.cluster_centers_[:, 1],
+                                        self.kMeans.cluster_centers_[:, 0],
+                                        s=100, c="orange")
+                        plt.savefig(consts.PATH_IMG_FOLDER 
+                                    + 'epoch%d_image%d_clusters.png' % (epoch, total),
+                                    bbox_inches='tight')
+                        r.remove()
+                if self.limit_train_epoch_len is not None and \
+                        total >= self.limit_train_epoch_len :
+                    break
+            if self.validation:
+                self.test(epoch)
+        plt.clf()
+        return None
+
     def test(self, epoch=-1):
         total, success = 0, 0
         for image, true_label in self.test_loader:
             if self.random_mode == consts.RandomMode.TRAIN_TEST_KMEANS :
                 image.requires_grad = True
-            self.color_jitter_module.jitter()
+            if self.jitter : 
+                self.color_jitter_module.jitter()
             vector_scores = self.model(self.normalize(image))
             model_label = torch.argmax(vector_scores).item()
             if model_label != true_label.item() :
                 continue
-            if self.mode in [consts.Mode.TARGET, consts.Mode.TARGET_AND_FLEE] \
+            elif self.mode in [consts.Mode.TARGET, consts.Mode.TARGET_AND_FLEE] \
                     and model_label == self.target_class:
                 continue
             elif self.mode == consts.Mode.FLEE and model_label != self.target_class:
@@ -230,12 +318,12 @@ class PatchTrainer():
             if not self.distort:
                 mask = self.get_mask(empty_with_patch)
                 attacked = torch.mul(1 - mask, image) + \
-                                    torch.mul(mask, empty_with_patch)
+                           torch.mul(mask, empty_with_patch)
             else:
                 distorted, _ = self.dist_tool.distort(empty_with_patch)
                 mask = self.get_mask(distorted)
                 attacked = torch.mul(1 - mask, image) + \
-                                    torch.mul(mask, distorted)
+                           torch.mul(mask, distorted)
 
             normalized = self.normalize(attacked)
             vector_scores = self.model(normalized)
@@ -261,86 +349,12 @@ class PatchTrainer():
                                 'test_epoch%d_clusters.png' % epoch,
                                 bbox_inches='tight')
                     r.remove()
-
-            print('sucess/total : %d/%d accuracy : %.2f' % 
-                 (success, total, (100 * success / float(total))))
-            if consts.LIMIT_TEST_LEN is not None and total >= consts.LIMIT_TEST_LEN:
+            self.pretty_printer.update_test(epoch, 100 * success / float(total), total)
+            #print('success/total : %d/%d accuracy : %.2f' % 
+            #     (success, total, (100 * success / float(total))))
+            if self.limit_test_len is not None and total >= self.limit_test_len :
                 break
         self.success_rate_test[epoch] = 100 * (success / float(total))
-
-    def train(self):
-        for epoch in range(self.n_epochs):
-            n = 0
-            self.target_proba_train[epoch] = []
-            for image, true_label in self.train_loader:
-                if self.random_mode in [consts.RandomMode.TRAIN_KMEANS,
-                                        consts.RandomMode.TRAIN_TEST_KMEANS]:
-                    image.requires_grad = True
-                self.color_jitter_module.jitter()
-                vector_scores = self.model(self.normalize(image))
-                model_label = torch.argmax(vector_scores).item()
-                if model_label != true_label.item() :
-                    continue
-                if self.mode in [consts.Mode.TARGET, consts.Mode.TARGET_AND_FLEE] and \
-                        model_label == self.target_class:
-                    continue
-                elif self.mode == consts.Mode.FLEE and \
-                        model_label != self.target_class:
-                    continue
-                n += 1
-                
-                if self.random_mode == consts.RandomMode.FULL_RANDOM :
-                    row0, col0 = self.random_position()
-                else :
-                    loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
-                    loss[0, model_label].backward()
-                    row0, col0 = self.find_patch_position(image.grad)
-                    image.requires_grad = False
-
-                ret = self.attack(image, row0, col0)
-                first_target_proba, attacked, empty_with_patch = ret
-                
-                self.target_proba_train[epoch].append(first_target_proba)
-                
-                if n % consts.N_ENREG_IMG == 0:
-                    torchvision.utils.save_image(image, 
-                                                 consts.PATH_IMG_FOLDER + 
-                                                 'epoch%d_image%d_label%d_original.png'
-                                                 % (epoch, n, true_label.item()))
-
-                    torchvision.utils.save_image(empty_with_patch, 
-                                                 consts.PATH_IMG_FOLDER + 
-                                                 'epoch%d_image%d_empty_with_patch.png'
-                                                 % (epoch, n))
-
-                    torchvision.utils.save_image(attacked, 
-                                                 consts.PATH_IMG_FOLDER + 
-                                                 'epoch%d_image%d_attacked.png'
-                                                 % (epoch, n))
-
-                    torchvision.utils.save_image(self.patch, 
-                                                 consts.PATH_IMG_FOLDER + 
-                                                 'epoch%d_image%d_patch.png'
-                                                 % (epoch, n))
-
-                    plt.imshow(u.tensor_to_array(image))
-
-                    if self.random_mode in [consts.RandomMode.TRAIN_KMEANS,
-                                            consts.RandomMode.TRAIN_TEST_KMEANS]:
-                        r = plt.scatter(self.kMeans.cluster_centers_[:, 1],
-                                        self.kMeans.cluster_centers_[:, 0],
-                                        s=100, c="orange")
-                        plt.savefig(consts.PATH_IMG_FOLDER 
-                                    + 'epoch%d_image%d_clusters.png' % (epoch, n),
-                                    bbox_inches='tight')
-                        r.remove()
-                if consts.LIMIT_TRAIN_EPOCH_LEN is not None and \
-                        n >= consts.LIMIT_TRAIN_EPOCH_LEN :
-                    break
-            if self.validation:
-                self.test(epoch)
-        plt.clf()
-        return None
 
     def save_patch(self, path):
         self.model = None
