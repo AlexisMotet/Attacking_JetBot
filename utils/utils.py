@@ -1,9 +1,7 @@
-import sys
 import torch
 import numpy as np
 import torchvision
 import constants.constants as consts
-from IPython.display import clear_output
 
 def tensor_to_array(tensor):
     tensor = torch.squeeze(tensor)
@@ -83,7 +81,6 @@ class PrettyPrinter():
                             Attribute("lambda_print"),
                             Attribute("threshold"),
                             Attribute("max_iterations"))
-        self.notebook = notebook
 
     def training(self):
         print("================ TRAINING ================")
@@ -96,18 +93,18 @@ class PrettyPrinter():
         if len(self.attributes) % 2 != 0 : print("%s=%s" % (name, val))
         print("==========================================")
         
-    def update_test(self, epoch, total, success_rate):
-        txt = "[TEST] Epoch %2d - Image %3d - Success rate %1.3f%%" % (epoch, total, success_rate)
+    def update_test(self, epoch, success_rate, total):
+        txt = "[TEST] Epoch %02d - Success rate %1.3f%% - Image %03d " % (epoch, success_rate, total)
         if len(txt) != self.last_len : self.clear()
         print(txt, end="\r")
         self.last_len = len(txt)
 
-    def update_image(self, epoch, total, success_rate):
-        self.saved = "[TRAINING] Epoch %2d - Image %3d - Success rate of training on epoch %1.3f%%" % (epoch, total, success_rate)
+    def update_image(self, epoch, success_rate, total):
+        self.saved = "[TRAINING] Epoch %02d - Success rate while training %1.3f%% - Image %03d" % (epoch, success_rate, total)
 
     def update_iteration(self, i, target_proba):
         assert self.saved
-        txt = "%s - [ATTACK] Gradient descent iteration %2d - Target probability %1.3f" % (self.saved, i, target_proba)
+        txt = "%s - [ATTACK] Gradient descent iteration %03d - Target probability %1.3f" % (self.saved, i, target_proba)
         if len(txt) != self.last_len : self.clear()
         print(txt, end="\r")
         self.last_len = len(txt)
@@ -116,7 +113,8 @@ class PrettyPrinter():
         if self.last_len:
             spaces = " " * self.last_len
             print(spaces, end="\r")
-    """
+            
+"""
 if __name__ == "__main__":
     import time
     pretty_printer = PrettyPrinter(None)

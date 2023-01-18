@@ -81,6 +81,7 @@ class Trainer(unittest.TestCase):
                                                     path_printable_colors,
                                                     distort=True,
                                                     patch_relative_size=0.05)
+                                                    
         self.patch_trainer_flee = new_patch.PatchTrainer(path_model,
                                                          path_dataset,
                                                          path_calibration,

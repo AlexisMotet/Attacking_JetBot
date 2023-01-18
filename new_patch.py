@@ -224,7 +224,7 @@ class PatchTrainer():
                 elif self.mode == consts.Mode.FLEE and \
                         model_label != self.target_class:
                     continue
-                self.pretty_printer.update_image(epoch, total, success_rate)
+                self.pretty_printer.update_image(epoch, success_rate, total)
                 total += 1
                 
                 if self.random_mode == consts.RandomMode.FULL_RANDOM :
@@ -284,7 +284,6 @@ class PatchTrainer():
             if self.validation:
                 self.test(epoch)
         plt.clf()
-        self.pretty_printer.clear()
         return None
 
     def test(self, epoch=-1):
@@ -350,7 +349,7 @@ class PatchTrainer():
                                 'test_epoch%d_clusters.png' % epoch,
                                 bbox_inches='tight')
                     r.remove()
-            self.pretty_printer.update_test(epoch, total, (100 * success / float(total)))
+            self.pretty_printer.update_test(epoch, 100 * success / float(total), total)
             #print('success/total : %d/%d accuracy : %.2f' % 
             #     (success, total, (100 * success / float(total))))
             if self.limit_test_len is not None and total >= self.limit_test_len :
