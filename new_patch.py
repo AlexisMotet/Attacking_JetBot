@@ -14,11 +14,11 @@ import constants.constants as consts
 
 class PatchTrainer():
     def __init__(self, mode=consts.Mode.TARGET, random_mode=consts.RandomMode.FULL_RANDOM, 
-                 validation=True, n_classes=10,  target_class=2, patch_relative_size=0.05, 
+                 validation=True, target_class=2, patch_relative_size=0.05, 
                  jitter=False, distort=False, n_epochs=2, lambda_tv=0, lambda_print=0, 
                  threshold=0.9, max_iterations=10):
 
-        self.pretty_printer = u.PrettyPrinter(self, False)
+        self.pretty_printer = u.PrettyPrinter(self)
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         self.path_model = consts.PATH_MODEL
         self.path_dataset = consts.PATH_DATASET
@@ -27,7 +27,6 @@ class PatchTrainer():
         self.mode = mode
         self.random_mode = random_mode
         self.validation = validation
-        self.n_classes = n_classes
         self.target_class = target_class
         self.patch_relative_size = patch_relative_size
         self.jitter = jitter
@@ -38,7 +37,7 @@ class PatchTrainer():
         self.threshold = threshold
         self.max_iterations = max_iterations
 
-        self.model = u.load_model(self.path_model, n_classes=self.n_classes)
+        self.model = u.load_model(self.path_model, n_classes=consts.N_CLASSES)
         self.model.eval()
         self.train_loader, self.test_loader = u.load_dataset(self.path_dataset)
 

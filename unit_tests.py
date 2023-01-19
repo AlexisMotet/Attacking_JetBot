@@ -15,27 +15,13 @@ import PIL
 import torchvision
 
 
-path_model = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\new_imagenette2-160_model.pth'
-path_dataset = 'U:\\PROJET_3A\\imagenette2-160\\train'
-path_calibration = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\calibration\\'
-path_distortion = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\distortion\\distortion.so'
-path_printable_colors = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\printability\\printable_colors.txt'
-
-"""
-path_model = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\new_imagenette2-160_model.pth'
-path_dataset = 'C:\\Users\\alexi\\PROJET_3A\\imagenette2-160\\train'
-path_calibration = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\calibration\\'
-path_distortion = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\distortion\\distortion.so'
-path_printable_colors = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\printability\\printable_colors.txt'
-"""
-
 def tensor_to_array(tensor):
     tensor = torch.clamp(tensor, 0, 1)
     return u.tensor_to_array(tensor)
 
 class ImageTransformation(unittest.TestCase):
     def setUp(self):
-        self.train_loader, _ = u.load_dataset(path_dataset)
+        self.train_loader, _ = u.load_dataset(c.PATH_DATASET)
         self.normalize = torchvision.transforms.Normalize(mean=c.MEAN, std=c.STD)
         self.color_jitter_module = color_jitter.ColorJitterModule()
 
@@ -59,11 +45,13 @@ class ImageTransformation(unittest.TestCase):
         _, (ax1, ax2) = plt.subplots(1, 2)
         plt.suptitle("TEST JITTER")
         for img, _ in self.train_loader:
+            self.color_jitter_module.jitter()
             ax1.imshow(tensor_to_array(img), interpolation='nearest')
             ax1.set_title('original image')
 
             t0 = time.time()
             jittered_img = self.color_jitter_module(img)
+            print(torch.equal(img, jittered_img))
             t1 = time.time()
             ax2.imshow(tensor_to_array(jittered_img), interpolation='nearest')
             ax2.set_title('jitter image\ndeltat=%.2fms' % ((t1 - t0)*1e3))
@@ -74,20 +62,10 @@ class ImageTransformation(unittest.TestCase):
         
 class Trainer(unittest.TestCase):
     def setUp(self):
-        self.patch_trainer = new_patch.PatchTrainer(path_model,
-                                                    path_dataset,
-                                                    path_calibration,
-                                                    path_distortion,
-                                                    path_printable_colors,
-                                                    distort=True,
+        self.patch_trainer = new_patch.PatchTrainer(distort=True,
                                                     patch_relative_size=0.05)
                                                     
-        self.patch_trainer_flee = new_patch.PatchTrainer(path_model,
-                                                         path_dataset,
-                                                         path_calibration,
-                                                         path_distortion,
-                                                         path_printable_colors,
-                                                         distort=True,
+        self.patch_trainer_flee = new_patch.PatchTrainer(distort=True,
                                                          mode=c.Mode.FLEE,
                                                          threshold=0,
                                                          patch_relative_size=0.05)
@@ -217,6 +195,98 @@ class Trainer(unittest.TestCase):
                 
                 ax5.imshow(tensor_to_array(trainer.patch), interpolation='nearest')
                 ax5.set_title('patch')
+                plt.pause(0.1)
+            trainer.patch = empty_with_patch[0, :, row0:row0 + trainer.patch_dim, 
+                                                   col0:col0 + trainer.patch_dim]
+        plt.show()
+
+    def test_attack2(self):
+        trainer = self.patch_trainer
+        _, (ax1, ax2, ax3, ax4, ax5, ax6) = plt.subplots(1, 6)
+        jitter_module = color_jitter.ColorJitterModule()
+        my_transform = torchvision.transforms.Compose([
+                            jitter_module,
+                            torchvision.transforms.Normalize(mean=c.MEAN, 
+                                                            std=c.STD)
+                            ])
+        plt.suptitle("TEST ATTACK")
+        for image, true_label in trainer.train_loader:
+            ax1.imshow(tensor_to_array(image), interpolation='nearest')
+            ax1.set_title('image')
+            vector_scores = trainer.model(trainer.normalize(image))
+            model_label = int(torch.argmax(vector_scores))
+            if model_label is not int(true_label) or \
+                    model_label is trainer.target_class:
+                continue
+
+            row0, col0 = trainer.random_position()
+            empty_with_patch = torch.zeros(1, 3, c.IMAGE_DIM, 
+                                                 c.IMAGE_DIM)
+            empty_with_patch[0, :, row0:row0 + trainer.patch_dim, 
+                                   col0:col0 + trainer.patch_dim] = trainer.patch
+            mask = trainer.get_mask(empty_with_patch)
+            i = 0
+
+            while True:
+                attacked = torch.mul(1 - mask, image) + torch.mul(mask, empty_with_patch)
+                attacked.requires_grad = True
+                
+                normalized = trainer.normalize(attacked)
+                
+                vector_scores = trainer.model(normalized)
+                vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
+                target_proba = vector_proba[0, trainer.target_class]
+                
+                ax2.imshow(tensor_to_array(normalized), interpolation='nearest')
+                ax2.set_title('attacked \nproba : %.2f' % target_proba)
+                if i > 0:
+                    print('iteration %d target proba %.2f' % (i, target_proba))
+                if target_proba >= trainer.threshold or \
+                        i >= trainer.max_iterations :
+                    break
+                i += 1
+                loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
+                loss[0, trainer.target_class].backward()
+                sauv_grad1 = attacked.grad.clone()
+                sauv_attacked1 = attacked.clone().detach()
+                empty_with_patch -= attacked.grad
+                
+                normalized_grad = u.normalize_tensor(attacked.grad)
+                ax3.imshow(tensor_to_array(normalized_grad), 
+                           interpolation='nearest')
+
+                ax4.imshow(tensor_to_array(empty_with_patch), interpolation='nearest')
+                ax4.set_title('empty with patch')
+
+                attacked.grad.zero_()
+
+                jittered = torchvision.transforms.functional.adjust_brightness(attacked, 1)
+                normalized2 = my_transform(jittered)
+                
+                vector_scores = trainer.model(normalized2)
+                vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
+                target_proba = vector_proba[0, trainer.target_class]
+
+                ax5.imshow(tensor_to_array(normalized2), interpolation='nearest')
+                ax5.set_title('attacked \nproba : %.2f' % target_proba)
+
+                loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
+                loss[0, trainer.target_class].backward()
+                sauv_grad2 = attacked.grad.clone()
+                sauv_attacked2 = attacked.clone().detach()
+
+                print(torch.equal(sauv_grad1, sauv_grad2))
+                print(torch.equal(sauv_attacked1, sauv_attacked2))
+                copie = attacked.clone().detach()
+                print("%f" % torch.nn.functional.mse_loss(copie, torchvision.transforms.functional.adjust_brightness(copie, 1.0)))
+                print(torch.equal(copie, torchvision.transforms.functional.adjust_brightness(copie, 1.0)))
+
+                normalized_grad = u.normalize_tensor(attacked.grad)
+                ax6.imshow(tensor_to_array(normalized_grad), 
+                           interpolation='nearest')
+                ax6.set_title('normalized grad')
+                
+
                 plt.pause(0.1)
             trainer.patch = empty_with_patch[0, :, row0:row0 + trainer.patch_dim, 
                                                    col0:col0 + trainer.patch_dim]
@@ -387,9 +457,8 @@ class Trainer(unittest.TestCase):
                     
 class Tools(unittest.TestCase):
     def setUp(self):
-        self.patch_trainer = new_patch.PatchTrainer(path_model,
-                                                    path_dataset,
-                                                    distort=True)
+        self.patch_trainer = new_patch.PatchTrainer(distort=True)
+
         transform = torchvision.transforms.Compose([
             torchvision.transforms.Resize(256),
             torchvision.transforms.CenterCrop(224),
@@ -400,7 +469,7 @@ class Tools(unittest.TestCase):
         for i, path in enumerate(["\\n01440764\\n01440764_17174.JPEG", 
                                   "\\n03394916\\ILSVRC2012_val_00007536.JPEG"]):
             
-            image = PIL.Image.open(path_dataset + path)
+            image = PIL.Image.open(c.PATH_DATASET + path)
             image = transform(image)
             self.batch[i] = image
     
@@ -427,7 +496,7 @@ class Tools(unittest.TestCase):
     def test_printability(self):
         assert len(self.batch) >= 1
         e = 0.005
-        print_module = p.PrintabilityModule(path_printable_colors, c.IMAGE_DIM)
+        print_module = p.PrintabilityModule(c.PATH_PRINTABLE_COLORS, c.IMAGE_DIM)
         image = self.batch[0]
         image = image[None, :]
         image.requires_grad = True
@@ -449,7 +518,7 @@ class Tools(unittest.TestCase):
         _, (ax1, ax2) = plt.subplots(1, 2)
         image = torch.rand(1, 3, 3, 3)
         image.requires_grad = True
-        print_module = p.PrintabilityModule(path_printable_colors, 3)
+        print_module = p.PrintabilityModule(c.PATH_PRINTABLE_COLORS, 3)
         colors = print_module.colors[:, :, 0, 0]
         assert len(colors) == 30
         colors = colors.reshape(5, 6, 3)

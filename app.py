@@ -18,16 +18,6 @@ def except_hook(cls, exception, traceback):
 def random_color():
     return tuple(np.random.randint(200, 256, size=3))
 
-class Attribute():
-    def __init__(self, name):
-        self.name = name
-    
-    def get_attribute(self, patch_trainer) :
-        return getattr(patch_trainer, self.name)
-    
-    def get_tuple(self, patch_trainer):
-        return (self.name, self.get_attribute(patch_trainer))
-
 def center(window):
     frame_geometry = window.frameGeometry()
     screen = QApplication.desktop().screenNumber(QApplication.desktop().cursor().pos())
@@ -119,22 +109,22 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
-        self.attributes = (Attribute("date"),
-                            Attribute("path_model"),
-                            Attribute("path_dataset"),
-                            Attribute("limit_train_epoch_len"),
-                            Attribute("limit_test_len"),
-                            Attribute("mode"),
-                            Attribute("random_mode"),
-                            Attribute("target_class"),
-                            Attribute("patch_relative_size"),
-                            Attribute("jitter"),
-                            Attribute("distort"),
-                            Attribute("n_epochs"),
-                            Attribute("lambda_tv"),
-                            Attribute("lambda_print"),
-                            Attribute("threshold"),
-                            Attribute("max_iterations"))
+        self.attributes = (u.Attribute("date"),
+                            u.Attribute("path_model"),
+                            u.Attribute("path_dataset"),
+                            u.Attribute("limit_train_epoch_len"),
+                            u.Attribute("limit_test_len"),
+                            u.Attribute("mode"),
+                            u.Attribute("random_mode"),
+                            u.Attribute("target_class"),
+                            u.Attribute("patch_relative_size"),
+                            u.Attribute("jitter"),
+                            u.Attribute("distort"),
+                            u.Attribute("n_epochs"),
+                            u.Attribute("lambda_tv"),
+                            u.Attribute("lambda_print"),
+                            u.Attribute("threshold"),
+                            u.Attribute("max_iterations"))
         
         self.setWindowTitle("Patch Viewer")
         file_menu = self.menuBar().addMenu("File")
