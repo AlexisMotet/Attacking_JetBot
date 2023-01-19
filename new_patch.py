@@ -18,7 +18,7 @@ class PatchTrainer():
                  jitter=False, distort=False, n_epochs=2, lambda_tv=0, lambda_print=0, 
                  threshold=0.9, max_iterations=10):
 
-        self.pretty_printer = u.PrettyPrinter(self, False)
+        self.pretty_printer = u.PrettyPrinter(self)
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         self.path_model = consts.PATH_MODEL
         self.path_dataset = consts.PATH_DATASET
