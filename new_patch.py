@@ -1,20 +1,15 @@
 import torch
 import torchvision
 import datetime
-import total_variation.new_total_variation as total_variation
-import printability.new_printability as printability
-import color_jitter.color_jitter as color_jitter
+import image_transformation.image_transformation as image_transformation
 import pickle
-import matplotlib.pyplot as plt
 import utils.utils as u
 import constants.constants as consts
-import transformation
+import transformation.transformation as transformation
 
 class PatchTrainer():
     def __init__(self, mode=consts.Mode.TARGET, validation=True, 
-                 target_class=2, patch_relative_size=0.05, 
-                 jitter=False, distort=False, n_epochs=2, 
-                 lambda_tv=0, lambda_print=0, 
+                 target_class=2, patch_relative_size=0.05, n_epochs=2, 
                  threshold=0.9, max_iterations=10):
 
         self.pretty_printer = u.PrettyPrinter(self)
@@ -27,11 +22,7 @@ class PatchTrainer():
         self.validation = validation
         self.target_class = target_class
         self.patch_relative_size = patch_relative_size
-        self.jitter = jitter
-        self.distort = distort
         self.n_epochs = n_epochs
-        self.lambda_tv = lambda_tv
-        self.lambda_print = lambda_print
         self.threshold = threshold
         self.max_iterations = max_iterations
 
@@ -42,24 +33,10 @@ class PatchTrainer():
         image_size = consts.IMAGE_DIM ** 2
         patch_size = image_size * self.patch_relative_size
         self.patch_dim = int(patch_size ** (0.5))
-        
-        if not self.jitter : 
-            self.normalize = torchvision.transforms.Normalize(mean=consts.MEAN, 
-                                                              std=consts.STD)
-        else :
-            self.color_jitter_module = color_jitter.ColorJitterModule()
-            self.normalize = torchvision.transforms.Compose([
-                            self.color_jitter_module,
-                            torchvision.transforms.Normalize(mean=consts.MEAN, 
-                                                            std=consts.STD)
-                            ])
-        
-        self.transformation_tool = transformation.TransformationTool(self.patch_dim,
-                                                                     distort)
 
-        self.tv_module = total_variation.TotalVariationModule()
-
-        self.print_module = printability.PrintabilityModule(self.patch_dim)
+        self.image_transformation_module = image_transformation.ImageTransformationModule()
+        
+        self.transformation_tool = transformation.TransformationTool(self.patch_dim)
 
         self.patch = self._random_patch_init()
 
@@ -79,7 +56,7 @@ class PatchTrainer():
         success, total = 0, 0
         for loader in [self.train_loader, self.test_loader]:
             for image, label in loader:
-                output = self.model(self.normalize(image))
+                output = self.model(self.image_transformation_module.normalize(image))
                 success += (label == output.argmax(1)).sum()
                 total += len(label)
                 print('sucess/total : %d/%d accuracy : %.2f' 
@@ -96,30 +73,18 @@ class PatchTrainer():
                      consts.IMAGE_DIM//2 - self.patch_dim//2
         return self.patch[:, :, row0:row0 + self.patch_dim, 
                                 col0:col0 + self.patch_dim]
-    
-    def _get_grad(self, module):
-        _patch = self._get_patch()
-        _patch.requires_grad = True
-        loss = module(_patch)
-        loss.backward()
-        grad = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
-        row0, col0 = consts.IMAGE_DIM//2 - self.patch_dim//2, \
-                     consts.IMAGE_DIM//2 - self.patch_dim//2
-        grad[0, :, row0:row0 + self.patch_dim, 
-                   col0:col0 + self.patch_dim] = _patch.grad.clone().detach()
-        return grad
 
     def attack(self, image):
-        transformed, map_ = self.transformation_tool.random_transfom(self.patch)
+        transformed, map_ = self.transformation_tool.random_transform(self.patch)
         mask = self._get_mask(transformed)
         for i in range(self.max_iterations + 1) :
             attacked = torch.mul(1 - mask, image) + \
                        torch.mul(mask, transformed)
             attacked.requires_grad = True
-            normalized = self.normalize(attacked)
+            normalized = self.image_transformation_module(attacked)
             vector_scores = self.model(normalized)
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
-            target_proba = vector_proba[0, self.target_class].item()
+            target_proba = float(vector_proba[0, self.target_class])
             
             if i == 0: first_target_proba = target_proba
             else: self.pretty_printer.update_iteration(i, target_proba)
@@ -140,7 +105,7 @@ class PatchTrainer():
             elif self.mode == consts.Mode.TARGET_AND_FLEE:
                 loss[0, self.target_class].backward(retain_graph=True)
                 transformed -= attacked.grad 
-                model_label = torch.argmax(vector_scores).item()
+                model_label = int(torch.argmax(vector_scores))
                 if model_label != self.target_class :
                     attacked.grad.zero_()
                     loss[0, model_label].backward()
@@ -148,10 +113,6 @@ class PatchTrainer():
 
         self.patch = self.transformation_tool.undo_transform(self.patch, 
                                                              transformed, map_)
-        print_grad = self._get_grad(self.print_module)
-        tv_grad = self._get_grad(self.tv_module)
-        
-        self.patch -= self.lambda_tv * tv_grad + self.lambda_print * print_grad
         
         return first_target_proba, normalized
 
@@ -161,11 +122,10 @@ class PatchTrainer():
             total, success = 0, 0
             self.target_proba_train[epoch] = []
             for image, true_label in self.train_loader:
-                if self.jitter : 
-                    self.color_jitter_module.jitter()
-                vector_scores = self.model(self.normalize(image))
-                model_label = torch.argmax(vector_scores).item()
-                if model_label != true_label.item() :
+                self.image_transformation_module.jitter()
+                vector_scores = self.model(self.image_transformation_module(image))
+                model_label = int(torch.argmax(vector_scores))
+                if model_label != int(true_label) :
                     continue
                 elif self.mode in [consts.Mode.TARGET, 
                                    consts.Mode.TARGET_AND_FLEE] and \
@@ -174,6 +134,7 @@ class PatchTrainer():
                 elif self.mode == consts.Mode.FLEE and \
                         model_label != self.target_class:
                     continue
+
                 if total == 0 :
                     success_rate = None
                 else :
@@ -192,12 +153,11 @@ class PatchTrainer():
                 elif self.mode == consts.Mode.FLEE :
                     if first_target_proba <= self.threshold : success += 1
 
-                
                 if total % consts.N_ENREG_IMG == 0:
                     torchvision.utils.save_image(image, 
                                                  consts.PATH_IMG_FOLDER + 
                                                  'epoch%d_image%d_label%d_original.png'
-                                                 % (epoch, total, true_label.item()))
+                                                 % (epoch, total, int(true_label)))
 
                     torchvision.utils.save_image(attacked, 
                                                  consts.PATH_IMG_FOLDER + 
@@ -219,11 +179,10 @@ class PatchTrainer():
     def test(self, epoch=-1):
         total, success = 0, 0
         for image, true_label in self.test_loader:
-            if self.jitter : 
-                self.color_jitter_module.jitter()
-            vector_scores = self.model(self.normalize(image))
-            model_label = torch.argmax(vector_scores).item()
-            if model_label != true_label.item() :
+            self.image_transformation_module.jitter()
+            vector_scores = self.model(self.image_transformation_module(image))
+            model_label = int(torch.argmax(vector_scores))
+            if model_label != int(true_label) :
                 continue
             elif self.mode in [consts.Mode.TARGET, consts.Mode.TARGET_AND_FLEE] \
                     and model_label == self.target_class:
@@ -233,10 +192,10 @@ class PatchTrainer():
             
             total += 1
             
-            transformed, _ = self.transformation_tool.random_transfom(self.patch)
+            transformed, _ = self.transformation_tool.random_transform(self.patch)
             mask = self._get_mask(transformed)
             attacked = torch.mul(1 - mask, image) + torch.mul(mask, transformed)
-            normalized = self.normalize(attacked)
+            normalized = self.image_transformation_module(attacked)
             vector_scores = self.model(normalized)
             attacked_label = int(torch.argmax(vector_scores))
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
@@ -263,8 +222,6 @@ class PatchTrainer():
         self.model = None
         self.train_loader = None
         self.test_loader = None
-        self.dist_tool = None
-        self.printability_tool = None
-        self.kMeans = None
+        self.patch = self._get_patch()
         pickle.dump(self, open(path, "wb"))
 

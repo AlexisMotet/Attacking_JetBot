@@ -33,14 +33,12 @@ class PatchWidget(QWidget):
 
         hbox = QHBoxLayout()
         vbox = QVBoxLayout()
-        
         figure = Figure()
         figure.subplots_adjust(bottom=0, top=1, left=0, right=1)
         canvas = FigureCanvas(figure)
         ax = figure.subplots()
         ax.set_axis_off()
         ax.imshow(np.clip(u.tensor_to_array(patch_trainer.patch), 0, 1))
-        
         window.tab_widget.currentChanged.connect(lambda : canvas.setFixedSize(
             self.frameGeometry().width()//8, self.frameGeometry().width()//8))
         window.resized.connect(lambda : canvas.setFixedSize(
@@ -117,11 +115,8 @@ class MainWindow(QMainWindow):
                             u.Attribute("mode"),
                             u.Attribute("target_class"),
                             u.Attribute("patch_relative_size"),
-                            u.Attribute("jitter"),
                             u.Attribute("distort"),
                             u.Attribute("n_epochs"),
-                            u.Attribute("lambda_tv"),
-                            u.Attribute("lambda_print"),
                             u.Attribute("threshold"),
                             u.Attribute("max_iterations"))
         
@@ -164,5 +159,4 @@ if __name__ == "__main__" :
     window.show()
 
     app.exec()
-    
     
