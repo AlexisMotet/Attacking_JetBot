@@ -102,7 +102,7 @@ class PrettyPrinter():
         if success_rate is None : 
             self.saved = "[TRAINING] Epoch %02d - Success rate while training %s - Image %03d" % (epoch, success_rate, total)
         else :
-            self.saved = "[TRAINING] Epoch %02d - Success rate while training %1.3f%% - Image %03d" % (epoch, success_rate, total)
+            self.saved = "[TRAINING] Epoch %02d - Success rate while training %3.3f%% - Image %03d" % (epoch, success_rate, total)
 
     def update_iteration(self, i, target_proba):
         assert self.saved

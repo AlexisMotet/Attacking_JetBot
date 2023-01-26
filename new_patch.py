@@ -37,7 +37,7 @@ class PatchTrainer():
         self.image_transformation_module = image_transformation.ImageTransformationModule()
         
         self.transformation_tool = transformation.TransformationTool(self.patch_dim)
-
+        
         self.patch = self._random_patch_init()
 
         self.target_proba_train = {}
@@ -79,6 +79,7 @@ class PatchTrainer():
         mask = self._get_mask(transformed)
         transformed.requires_grad = True
         for i in range(self.max_iterations + 1) :
+            torch.clamp(transformed, 0, 1)  
             modified = self.image_transformation_module(transformed)
             attacked = torch.mul(1 - mask, image) + \
                        torch.mul(mask, modified)
@@ -115,10 +116,10 @@ class PatchTrainer():
                     loss[0, model_label].backward()
                     with torch.no_grad():    
                         transformed += transformed.grad
-        
-        transformed.requires_grad = False
+            
         self.patch = self.transformation_tool.undo_transform(self.patch, 
-                                                             transformed, map_)
+                                                             transformed.detach(),
+                                                             map_)
         
         return first_target_proba, attacked
 

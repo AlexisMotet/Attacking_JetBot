@@ -1,11 +1,20 @@
 from enum import Enum
 
-
+"""
 PATH_MODEL = 'U:\\PROJET_3A\\projet_BONTEMPS_SCHAMPHELEIRE\\Project Adverserial Patch\\Collision Avoidance\\best_model_extended.pth'
 N_CLASSES = 2
 PATH_DATASET = 'U:\PROJET_3A\\projet_BONTEMPS_SCHAMPHELEIRE\\Project Adverserial Patch\\Collision Avoidance\\dataset\\'
 PATH_CALIBRATION = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\calibration\\'
-PATH_IMG_FOLDER = "U:\\PROJET_3A\\projet_NOUINOU_MOTET\\imagess\\"
+PATH_IMG_FOLDER = "U:\\PROJET_3A\\projet_NOUINOU_MOTET\\images\\"
+"""
+
+PATH_MODEL = 'C:\\Users\\alexi\\PROJET_3A\\Projet_Adversarial_Patch\\Project_Adverserial_Patch\\Collision_Avoidance\\best_model_extended.pth'
+N_CLASSES = 2
+PATH_DATASET = 'C:\\Users\\alexi\\PROJET_3A\\Projet_Adversarial_Patch\\Project_Adverserial_Patch\\Collision_Avoidance\\dataset\\'
+PATH_CALIBRATION = 'C:\\Users\\alexi\\PROJET_3A\\projet_3A\\calibration\\'
+PATH_IMG_FOLDER = "C:\\Users\\alexi\\PROJET_3A\\projet_3A\\images\\"
+
+PATH_PRINTABLE_COLORS = "C:\\Users\\alexi\\PROJET_3A\\projet_3A\\printability\\printable_colors.txt"
 
 BLUR_KERNEL_SIZE = 9
 BLUR_SIGMA_MAX = 1
