@@ -1,7 +1,5 @@
 import math
 import numpy as np
-import utils.utils as u
-import matplotlib.pyplot as plt
 import constants.constants as c
 import torch
 
@@ -65,7 +63,7 @@ class TransformationTool():
         x_t, y_t = np.random.randint(-c.IMAGE_DIM//2 + self.patch_dim, 
                                      c.IMAGE_DIM//2 - self.patch_dim, 2)
         angles = np.zeros(3)
-        # angles[np.random.randint(2)] = (2 * np.random.rand() - 1)/2
+        angles[np.random.randint(2)] = (2 * np.random.rand() - 1)/2
         mtx_transfo = self._get_matrix_transformation(x_t, y_t, 0, *angles)
         transformed = torch.zeros_like(image)
         map_ = {}
@@ -85,10 +83,10 @@ class TransformationTool():
                                 mtx_transfo[1][2])/d
                     
                     if self.distort :
-                        ni = (new_i_float - self.cx)/self.fx;
-                        nj = (new_j_float - self.cy)/self.fy;
+                        ni = (new_i_float - self.cx)/self.fx
+                        nj = (new_j_float - self.cy)/self.fy
 
-                        r2 = pow(ni, 2) + pow(nj, 2);
+                        r2 = pow(ni, 2) + pow(nj, 2)
                         rk = self.k1*r2 + self.k2*(r2**2) + self.k3*(r2**3)
                         ndi_f = ni + ni * rk
                         ndj_f = nj + nj * rk
@@ -96,8 +94,8 @@ class TransformationTool():
                         new_i_float = ndi_f * self.fx + self.cx
                         new_j_float = ndj_f * self.fy + self.cy
                         
-                    new_i = round(new_i_float)
-                    new_j = round(new_j_float)
+                    new_i = int(round(new_i_float))
+                    new_j = int(round(new_j_float))
                     
                     if 0 <= new_i < c.IMAGE_DIM and 0 <= new_j < c.IMAGE_DIM :
                         d = math.sqrt((new_i - new_i_float)**2 + 
@@ -108,8 +106,7 @@ class TransformationTool():
                             save[(new_j, new_i)] = {"values" : [], "weights" : []}
                         save[(new_j, new_i)]["values"].append(weight * image[0, :, j, i])
                         save[(new_j, new_i)]["weights"].append(weight)
-                        transformed[0, :, new_j, new_i] = sum(save[(new_j, new_i)]["values"])/\
-                                                          sum(save[(new_j, new_i)]["weights"])
+                        transformed[0, :, new_j, new_i] = sum(save[(new_j, new_i)]["values"])/sum(save[(new_j, new_i)]["weights"])
         return transformed, map_
             
     def undo_transform(self, image, transformed, map_):
