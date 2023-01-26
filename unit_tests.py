@@ -5,7 +5,7 @@ import time
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-import distortion.distortion as d
+# import distortion.distortion as d
 import total_variation.new_total_variation as tv
 import printability.new_printability as p
 import color_jitter.color_jitter as color_jitter
@@ -59,6 +59,21 @@ class ImageTransformation(unittest.TestCase):
             plt.pause(1)
         plt.show()
     
+    def test_skew(self):
+        _, (ax1, ax2) = plt.subplots(1, 2)
+        plt.suptitle("TEST SKEW")
+        import math
+        matrix_skew = np.eye(3)
+        matrix_skew[0, 1] = math.tan(math.radians(5))
+        print(matrix_skew)   
+        mask = np.zeros((200, 200))
+        mask[50:100, 50:100] = np.ones((50, 50))
+        ax1.imshow(mask)
+        skew = matrix_skew@mask
+        ax2.imshow(skew)
+        plt.show()
+        
+        
         
 class Trainer(unittest.TestCase):
     def setUp(self):
@@ -199,6 +214,7 @@ class Trainer(unittest.TestCase):
             trainer.patch = empty_with_patch[0, :, row0:row0 + trainer.patch_dim, 
                                                    col0:col0 + trainer.patch_dim]
         plt.show()
+        
 
     def test_attack2(self):
         trainer = self.patch_trainer
@@ -292,6 +308,67 @@ class Trainer(unittest.TestCase):
                                                    col0:col0 + trainer.patch_dim]
         plt.show()
 
+
+    def test_attack3(self):
+        trainer = self.patch_trainer
+        _, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5)
+        plt.suptitle("TEST ATTACK")
+        patch = torch.zeros(1, 3, 224, 224)
+        patch[0, :, 112-20:112+20, 112-20:112+20] = torch.rand(3, 40, 40)
+        import transformation
+        transformation_tool = transformation.TransformationTool(40)
+        for image, true_label in trainer.train_loader:
+            ax1.imshow(tensor_to_array(image), interpolation='nearest')
+            ax1.set_title('image')
+            vector_scores = trainer.model(trainer.normalize(image))
+            model_label = torch.argmax(vector_scores).item()
+            if model_label is not true_label.item() or \
+                    model_label is trainer.target_class:
+                continue
+
+            transformed, map_ = transformation_tool.random_transfom(patch)
+            mask = trainer._get_mask(transformed)
+            i = 0
+
+            while True:
+                t0 = time.time()
+                attacked = torch.mul(1 - mask, image) + torch.mul(mask, transformed)
+                attacked.requires_grad = True
+                
+                normalized = trainer.normalize(attacked)
+                
+                vector_scores = trainer.model(normalized)
+                vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
+                target_proba = vector_proba[0, 1]
+                
+                ax2.imshow(tensor_to_array(normalized), interpolation='nearest')
+                ax2.set_title('attacked \nproba : %.2f' % target_proba)
+                if i > 0:
+                    print('iteration %d target proba %.2f' % (i, target_proba))
+                if target_proba >= trainer.threshold or \
+                        i >= trainer.max_iterations :
+                    break
+                i += 1
+                loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
+                loss[0, 1].backward()
+                with torch.no_grad() :
+                    transformed -= attacked.grad
+                
+                t1 = time.time()
+                normalized_grad = u.normalize_tensor(attacked.grad)
+                ax3.imshow(tensor_to_array(normalized_grad), 
+                           interpolation='nearest')
+                ax3.set_title('normalized grad\ndeltat=%.2fms' % ((t1 - t0)*1e3))
+                
+                ax4.imshow(tensor_to_array(attacked), interpolation='nearest')
+                ax4.set_title('empty with patch')
+
+                
+                ax5.imshow(tensor_to_array(patch), interpolation='nearest')
+                ax5.set_title('patch')
+                plt.pause(1)
+            patch = transformation_tool.undo_transform(patch, transformed, map_)
+        plt.show()
 
     def test_attack_target(self):
         trainer = self.patch_trainer

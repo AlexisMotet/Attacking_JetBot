@@ -10,6 +10,10 @@ def tensor_to_array(tensor):
         return np.transpose(array, (1, 2, 0))
     return array
 
+def array_to_tensor(array):
+    array = np.transpose(array, (2, 0, 1))
+    array = array[np.newaxis, :]
+    return torch.tensor(array)
 
 def normalize_tensor(tensor):
     return tensor / torch.abs(torch.max(tensor))
@@ -76,7 +80,6 @@ class PrettyPrinter():
                             Attribute("distort"),
                             Attribute("n_epochs"),
                             Attribute("mode"),
-                            Attribute("random_mode"),
                             Attribute("lambda_tv"),
                             Attribute("lambda_print"),
                             Attribute("threshold"),
@@ -100,7 +103,10 @@ class PrettyPrinter():
         self.last_len = len(txt)
 
     def update_image(self, epoch, success_rate, total):
-        self.saved = "[TRAINING] Epoch %02d - Success rate while training %1.3f%% - Image %03d" % (epoch, success_rate, total)
+        if success_rate is None : 
+            self.saved = "[TRAINING] Epoch %02d - Success rate while training %s - Image %03d" % (epoch, success_rate, total)
+        else :
+            self.saved = "[TRAINING] Epoch %02d - Success rate while training %1.3f%% - Image %03d" % (epoch, success_rate, total)
 
     def update_iteration(self, i, target_proba):
         assert self.saved

@@ -115,7 +115,6 @@ class MainWindow(QMainWindow):
                             u.Attribute("limit_train_epoch_len"),
                             u.Attribute("limit_test_len"),
                             u.Attribute("mode"),
-                            u.Attribute("random_mode"),
                             u.Attribute("target_class"),
                             u.Attribute("patch_relative_size"),
                             u.Attribute("jitter"),
