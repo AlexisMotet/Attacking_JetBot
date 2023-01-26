@@ -5,9 +5,8 @@ PATH_MODEL = 'U:\\PROJET_3A\\projet_BONTEMPS_SCHAMPHELEIRE\\Project Adverserial 
 N_CLASSES = 2
 PATH_DATASET = 'U:\PROJET_3A\\projet_BONTEMPS_SCHAMPHELEIRE\\Project Adverserial Patch\\Collision Avoidance\\dataset\\'
 PATH_CALIBRATION = 'U:\\PROJET_3A\\projet_NOUINOU_MOTET\\calibration\\'
-PATH_IMG_FOLDER = "U:\\PROJET_3A\\projet_NOUINOU_MOTET\\image\\"
+PATH_IMG_FOLDER = "U:\\PROJET_3A\\projet_NOUINOU_MOTET\\imagess\\"
 
-ANGLE_VARIATION = 
 BLUR_KERNEL_SIZE = 9
 BLUR_SIGMA_MAX = 1
 BRIGHTNESS_BIAS = 0.25

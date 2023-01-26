@@ -77,11 +77,12 @@ class PatchTrainer():
     def attack(self, image):
         transformed, map_ = self.transformation_tool.random_transform(self.patch)
         mask = self._get_mask(transformed)
+        transformed.requires_grad = True
         for i in range(self.max_iterations + 1) :
+            modified = self.image_transformation_module(transformed)
             attacked = torch.mul(1 - mask, image) + \
-                       torch.mul(mask, transformed)
-            attacked.requires_grad = True
-            normalized = self.image_transformation_module(attacked)
+                       torch.mul(mask, modified)
+            normalized = self.image_transformation_module.normalize(attacked)
             vector_scores = self.model(normalized)
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
             target_proba = float(vector_proba[0, self.target_class])
@@ -98,23 +99,28 @@ class PatchTrainer():
             loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
             if self.mode == consts.Mode.TARGET :
                 loss[0, self.target_class].backward()
-                transformed -= attacked.grad
+                with torch.no_grad():
+                    transformed -= transformed.grad
             elif self.mode == consts.Mode.FLEE:
                 loss[0, self.target_class].backward()
-                transformed += attacked.grad
+                with torch.no_grad():
+                    transformed += transformed.grad
             elif self.mode == consts.Mode.TARGET_AND_FLEE:
                 loss[0, self.target_class].backward(retain_graph=True)
-                transformed -= attacked.grad 
+                with torch.no_grad():
+                    transformed -= transformed.grad 
                 model_label = int(torch.argmax(vector_scores))
                 if model_label != self.target_class :
-                    attacked.grad.zero_()
+                    transformed.grad.zero_()
                     loss[0, model_label].backward()
-                    transformed += attacked.grad
-
+                    with torch.no_grad():    
+                        transformed += transformed.grad
+        
+        transformed.requires_grad = False
         self.patch = self.transformation_tool.undo_transform(self.patch, 
                                                              transformed, map_)
         
-        return first_target_proba, normalized
+        return first_target_proba, attacked
 
     def train(self):
         self.pretty_printer.training()
@@ -123,7 +129,7 @@ class PatchTrainer():
             self.target_proba_train[epoch] = []
             for image, true_label in self.train_loader:
                 self.image_transformation_module.jitter()
-                vector_scores = self.model(self.image_transformation_module(image))
+                vector_scores = self.model(self.image_transformation_module.normalize(image))
                 model_label = int(torch.argmax(vector_scores))
                 if model_label != int(true_label) :
                     continue
@@ -164,7 +170,7 @@ class PatchTrainer():
                                                  'epoch%d_image%d_attacked.png'
                                                  % (epoch, total))
 
-                    torchvision.utils.save_image(self._get_patch(), 
+                    torchvision.utils.save_image(self.patch, 
                                                  consts.PATH_IMG_FOLDER + 
                                                  'epoch%d_image%d_patch.png'
                                                  % (epoch, total))
@@ -180,7 +186,7 @@ class PatchTrainer():
         total, success = 0, 0
         for image, true_label in self.test_loader:
             self.image_transformation_module.jitter()
-            vector_scores = self.model(self.image_transformation_module(image))
+            vector_scores = self.model(self.image_transformation_module.normalize(image))
             model_label = int(torch.argmax(vector_scores))
             if model_label != int(true_label) :
                 continue
@@ -194,8 +200,9 @@ class PatchTrainer():
             
             transformed, _ = self.transformation_tool.random_transform(self.patch)
             mask = self._get_mask(transformed)
-            attacked = torch.mul(1 - mask, image) + torch.mul(mask, transformed)
-            normalized = self.image_transformation_module(attacked)
+            modified = self.image_transformation_module(transformed)
+            attacked = torch.mul(1 - mask, image) + torch.mul(mask, modified)
+            normalized = self.image_transformation_module.normalize(attacked)
             vector_scores = self.model(normalized)
             attacked_label = int(torch.argmax(vector_scores))
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)

@@ -65,7 +65,7 @@ class TransformationTool():
                        c.IMAGE_DIM//2+self.patch_dim//2):
             for j in range(c.IMAGE_DIM//2-self.patch_dim//2, 
                            c.IMAGE_DIM//2+self.patch_dim//2):
-                if image[0, :, j, i].all() != 0 :
+                if image[0, :, j, i].numpy().any():
                     d = (mtx_transfo[2][0] * i + mtx_transfo[2][1] * j + 
                         mtx_transfo[2][2])
                     

@@ -21,6 +21,7 @@ class ImageTransformationModule(torch.nn.Module):
         self.order = random.getrandbits(1)
         
     def forward(self, image):
+        """
         if self.order : 
             brightness = image + self.brightness
             modified = brightness * self.contrast
@@ -29,4 +30,6 @@ class ImageTransformationModule(torch.nn.Module):
             modified = contrast + self.brightness
         blurred = torchvision.transforms.functional.gaussian_blur(modified, kernel_size=c.BLUR_KERNEL_SIZE, sigma=self.sigma_blur)
         noisy = blurred + self.noise
-        return self.normalize(noisy)
+        """
+        # noisy = image + self.noise
+        return image

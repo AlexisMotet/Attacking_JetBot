@@ -36,13 +36,13 @@ def load_dataset(path_dataset):
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=consts.BATCH_SIZE,
+        batch_size=1,
         shuffle=True,
     )
 
     test_loader = torch.utils.data.DataLoader(
         test_dataset,
-        batch_size=consts.BATCH_SIZE,
+        batch_size=1,
         shuffle=True,
     )
     return train_loader, test_loader
@@ -51,7 +51,7 @@ def load_dataset(path_dataset):
 def load_model(path_model, n_classes):
     model = torchvision.models.alexnet(pretrained=False)
     model.classifier[6] = torch.nn.Linear(model.classifier[6].in_features, n_classes)
-    model.load_state_dict(torch.load(path_model, map_location=torch.device('cpu')))
+    model.load_state_dict(torch.load(path_model, map_location=torch.device("cpu")))
     return model
 
 class Attribute():
@@ -76,12 +76,8 @@ class PrettyPrinter():
                             Attribute("limit_test_len"),
                             Attribute("target_class"),
                             Attribute("patch_relative_size"),
-                            Attribute("jitter"),
-                            Attribute("distort"),
                             Attribute("n_epochs"),
                             Attribute("mode"),
-                            Attribute("lambda_tv"),
-                            Attribute("lambda_print"),
                             Attribute("threshold"),
                             Attribute("max_iterations"))
 
