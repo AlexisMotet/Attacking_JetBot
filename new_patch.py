@@ -9,7 +9,7 @@ import transformation.transformation as transformation
 
 class PatchTrainer():
     def __init__(self, mode=consts.Mode.TARGET, validation=True, 
-                 target_class=2, patch_relative_size=0.05, n_epochs=2, 
+                 target_class=2, patch_relative_size=0.10, n_epochs=2, 
                  threshold=0.9, max_iterations=10):
 
         self.pretty_printer = u.PrettyPrinter(self)
@@ -44,7 +44,7 @@ class PatchTrainer():
         self.success_rate_test = {}
 
     def _random_patch_init(self):
-        patch = torch.empty(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
+        patch = torch.zeros(1, 3, consts.IMAGE_DIM, consts.IMAGE_DIM)
         row0, col0 = consts.IMAGE_DIM//2 - self.patch_dim//2, \
                      consts.IMAGE_DIM//2 - self.patch_dim//2
         patch[0, :, row0:row0 + self.patch_dim, 

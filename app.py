@@ -115,7 +115,6 @@ class MainWindow(QMainWindow):
                             u.Attribute("mode"),
                             u.Attribute("target_class"),
                             u.Attribute("patch_relative_size"),
-                            u.Attribute("distort"),
                             u.Attribute("n_epochs"),
                             u.Attribute("threshold"),
                             u.Attribute("max_iterations"))

@@ -5,10 +5,7 @@ import time
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
-# import distortion.distortion as d
-import total_variation.new_total_variation as tv
 import printability.new_printability as p
-import color_jitter.color_jitter as color_jitter
 import utils.utils as u
 import sklearn.cluster
 import PIL
@@ -23,7 +20,6 @@ class ImageTransformation(unittest.TestCase):
     def setUp(self):
         self.train_loader, _ = u.load_dataset(c.PATH_DATASET)
         self.normalize = torchvision.transforms.Normalize(mean=c.MEAN, std=c.STD)
-        self.color_jitter_module = color_jitter.ColorJitterModule()
 
     def test_normalization(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
@@ -58,64 +54,25 @@ class ImageTransformation(unittest.TestCase):
 
             plt.pause(1)
         plt.show()
-    
-    def test_skew(self):
-        _, (ax1, ax2) = plt.subplots(1, 2)
-        plt.suptitle("TEST SKEW")
-        import math
-        matrix_skew = np.eye(3)
-        matrix_skew[0, 1] = math.tan(math.radians(5))
-        print(matrix_skew)   
-        mask = np.zeros((200, 200))
-        mask[50:100, 50:100] = np.ones((50, 50))
-        ax1.imshow(mask)
-        skew = matrix_skew@mask
-        ax2.imshow(skew)
-        plt.show()
-        
-        
         
 class Trainer(unittest.TestCase):
     def setUp(self):
-        self.patch_trainer = new_patch.PatchTrainer(distort=True,
-                                                    patch_relative_size=0.05)
+        self.patch_trainer = new_patch.PatchTrainer(patch_relative_size=0.1)
                                                     
-        self.patch_trainer_flee = new_patch.PatchTrainer(distort=True,
-                                                         mode=c.Mode.FLEE,
+        self.patch_trainer_flee = new_patch.PatchTrainer(mode=c.Mode.FLEE,
                                                          threshold=0,
                                                          patch_relative_size=0.05)
-    def test_initialization(self):
-        patch = self.patch_trainer.patch
-        plt.imshow(tensor_to_array(patch), interpolation='nearest')
-        mean = [int(x*1e3)/1e3 for x in torch.mean(patch, dim=[2, 3]).tolist()[0]]
-        std = [int(x*1e3)/1e3 for x in torch.std(patch, dim=[2, 3]).tolist()[0]]
-        title = "mean=%s std=%s\n true_mean=%s true_std=%s" % \
-                (str(mean), (std), str(c.MEAN), str(c.STD))
-        plt.title(title)
-        plt.show()
-        plt.close()
-
-    def test_mask(self):
-        trainer = self.patch_trainer
+    def test_transformation(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
-        plt.suptitle("TEST MASK")
-        for _ in range(100) :
-            row0, col0 = self.patch_trainer.random_position()
-            empty_with_patch = torch.zeros(1, 3, c.IMAGE_DIM, c.IMAGE_DIM)
-            empty_with_patch[0, :, row0:row0 + trainer.patch_dim, 
-                                col0:col0 + trainer.patch_dim] = trainer.patch
-            
-            distorted, _ = trainer.dist_tool.distort(empty_with_patch)
-            mask = self.patch_trainer.get_mask(distorted)
-
-            ax1.imshow(tensor_to_array(distorted), interpolation='nearest')
-            ax1.set_title('distorted')
-
-            ax2.imshow(tensor_to_array(mask), interpolation='nearest')
-            ax2.set_title('mask')
-            plt.pause(1)
-        plt.show()
-
+        plt.suptitle("TEST TRANSFORMATION")
+        trainer = self.patch_trainer
+        for _ in range(100):
+            ax1.imshow(u.tensor_to_array(trainer.patch))
+            transformed, _ = trainer.transformation_tool.random_transform(trainer.patch)
+            ax2.imshow(u.tensor_to_array(transformed))
+            plt.pause(0.5)
+        
+        
     def test_distortion(self):
         _, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
         plt.suptitle("TEST DISTORTION")
