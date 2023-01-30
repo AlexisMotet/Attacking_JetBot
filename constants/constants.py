@@ -16,8 +16,9 @@ PATH_IMG_FOLDER = "C:\\Users\\alexi\\PROJET_3A\\projet_3A\\images\\"
 
 PATH_PRINTABLE_COLORS = "C:\\Users\\alexi\\PROJET_3A\\projet_3A\\printability\\printable_colors.txt"
 
-BLUR_KERNEL_SIZE = 9
-BLUR_SIGMA_MAX = 1
+NOISE_INTENSITY = 0.1
+BLUR_KERNEL_SIZE = 5
+BLUR_SIGMA_MAX = 0.5
 BRIGHTNESS_BIAS = 0.25
 CONTRAST_GAIN = 0.4
 RESIZE_DIM = 256
