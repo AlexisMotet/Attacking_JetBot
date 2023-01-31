@@ -142,7 +142,7 @@ class ImageTransformation(unittest.TestCase):
 
 class Trainer(unittest.TestCase):
     def setUp(self):
-        self.patch_trainer = new_patch.PatchTrainer(patch_relative_size=0.1)
+        self.patch_trainer = new_patch.PatchTrainer(patch_relative_size=0.05)
                                                     
     def test_transformation(self):
         _, (ax1, ax2) = plt.subplots(1, 2)

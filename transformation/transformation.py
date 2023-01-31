@@ -100,10 +100,10 @@ class TransformationTool():
         return transformed, map_
     
     def random_transform(self, image):
-        scale_factor = np.random.uniform(1/math.sqrt(2), 1)
+        scale_factor = np.random.uniform(0.8, 1)
         x_c, y_c = c.IMAGE_DIM//2, c.IMAGE_DIM//2
-        x_t, y_t = np.random.randint(-c.IMAGE_DIM//2, 
-                                      c.IMAGE_DIM//2, 2)
+        x_t, y_t = np.random.randint(-c.IMAGE_DIM//2 + self.patch_dim//2, 
+                                      c.IMAGE_DIM//2 - self.patch_dim//2, 2)
         point_t = (1/scale_factor) * np.array([x_c + x_t, y_c + y_t, 1])
         nx_t, ny_t = (self.matrix_2dto3d@point_t)[:2]
         angles = np.zeros(3)

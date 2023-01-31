@@ -4,7 +4,7 @@ from torchvision.transforms.functional import gaussian_blur
 import constants.constants as c
 import random
 
-class IntrisicModule(torch.nn.Module):
+class IntrinsicModule(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.jitter()
