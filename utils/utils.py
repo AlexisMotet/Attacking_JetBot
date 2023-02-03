@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import torchvision
-import constants.constants as consts
+import constants.constants as c
 
 def tensor_to_array(tensor):
     tensor = torch.squeeze(tensor)
@@ -23,13 +23,13 @@ def load_dataset(path_dataset):
         path_dataset,
         torchvision.transforms.Compose([
             torchvision.transforms.RandomHorizontalFlip(),
-            torchvision.transforms.Resize(consts.RESIZE_DIM),
-            torchvision.transforms.CenterCrop(consts.IMAGE_DIM),
+            torchvision.transforms.Resize(c.consts["RESIZE_DIM"]),
+            torchvision.transforms.CenterCrop(c.consts["IMAGE_DIM"]),
             torchvision.transforms.ToTensor(),
         ])
     )
 
-    n_train = int(consts.RATIO_TRAIN_TEST * len(dataset))
+    n_train = int(c.consts["RATIO_TRAIN_TEST"] * len(dataset))
     n_test = len(dataset) - n_train
     train_dataset, test_dataset = torch.utils.data.random_split(dataset, 
                                                                 [n_train, n_test])

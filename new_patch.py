@@ -1,7 +1,7 @@
 import torch
 import torchvision
 import datetime
-import image_transformation.image_transformation as i
+import image_processing.image_processing as i
 import pickle
 import utils.utils as u
 import constants.constants as c
@@ -14,10 +14,6 @@ class PatchTrainer():
 
         self.pretty_printer = u.PrettyPrinter(self)
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        self.path_model = c.PATH_MODEL
-        self.path_dataset = c.PATH_DATASET
-        self.limit_train_epoch_len = c.LIMIT_TRAIN_EPOCH_LEN
-        self.limit_test_len = c.LIMIT_TEST_LEN
         self.mode = mode
         self.validation = validation
         self.target_class = target_class
@@ -26,17 +22,17 @@ class PatchTrainer():
         self.threshold = threshold
         self.max_iterations = max_iterations
 
-        self.model = u.load_model(self.path_model, n_classes=c.N_CLASSES)
+        self.model = u.load_model(c.consts["PATH_MODEL"], n_classes=c.consts["N_CLASSES"])
         self.model.eval()
-        self.train_loader, self.test_loader = u.load_dataset(self.path_dataset)
+        self.train_loader, self.test_loader = u.load_dataset(c.consts["PATH_DATASET"])
 
-        image_size = c.IMAGE_DIM ** 2
+        image_size = c.consts["IMAGE_DIM"] ** 2
         patch_size = image_size * self.patch_relative_size
         self.patch_dim = int(patch_size ** (0.5))
 
-        self.extrinsic_module = i.ExtrinsicModule()
+        self.image_processing_module = i.ImageProcessingModule()
         
-        self.intrinsic_module = i.IntrinsicModule()
+        self.patch_processing_module = i.PatchProcessingModule()
         
         self.transformation_tool = t.TransformationTool(self.patch_dim)
         
@@ -46,9 +42,9 @@ class PatchTrainer():
         self.success_rate_test = {}
 
     def _random_patch_init(self):
-        patch = torch.zeros(1, 3, c.IMAGE_DIM, c.IMAGE_DIM)
-        row0, col0 = c.IMAGE_DIM//2 - self.patch_dim//2, \
-                     c.IMAGE_DIM//2 - self.patch_dim//2
+        patch = torch.zeros(1, 3, c.consts["IMAGE_DIM"], c.consts["IMAGE_DIM"])
+        row0, col0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
+                     c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
         patch[0, :, row0:row0 + self.patch_dim, 
                     col0:col0 + self.patch_dim] = torch.rand(3, self.patch_dim, 
                                                                 self.patch_dim)
@@ -58,7 +54,7 @@ class PatchTrainer():
         success, total = 0, 0
         for loader in [self.train_loader, self.test_loader]:
             for image, label in loader:
-                output = self.model(self.extrinsic_module(image))
+                output = self.model(self.image_processing_module(image))
                 success += (label == output.argmax(1)).sum()
                 total += len(label)
                 print('sucess/total : %d/%d accuracy : %.2f' 
@@ -71,8 +67,8 @@ class PatchTrainer():
         return mask
     
     def _get_patch(self):
-        row0, col0 = c.IMAGE_DIM//2 - self.patch_dim//2, \
-                     c.IMAGE_DIM//2 - self.patch_dim//2
+        row0, col0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
+                     c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
         return self.patch[:, :, row0:row0 + self.patch_dim, 
                                 col0:col0 + self.patch_dim]
 
@@ -82,10 +78,10 @@ class PatchTrainer():
         transformed.requires_grad = True
         for i in range(self.max_iterations + 1) :
             torch.clamp(transformed, 0, 1)
-            modified = self.intrinsic_module(transformed)
+            modified = self.patch_processing_module(transformed)
             attacked = torch.mul(1 - mask, image) + \
                        torch.mul(mask, modified)
-            normalized = self.extrinsic_module(attacked)
+            normalized = self.image_processing_module(attacked)
             vector_scores = self.model(normalized)
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
             target_proba = float(vector_proba[0, self.target_class])
@@ -130,7 +126,7 @@ class PatchTrainer():
             total, success = 0, 0
             self.target_proba_train[epoch] = []
             for image, true_label in self.train_loader:
-                vector_scores = self.model(self.extrinsic_module(image))
+                vector_scores = self.model(self.image_processing_module(image))
                 model_label = int(torch.argmax(vector_scores))
                 if model_label != int(true_label) :
                     continue
@@ -150,8 +146,8 @@ class PatchTrainer():
         
                 total += 1
                 
-                self.extrinsic_module.jitter()
-                self.intrinsic_module.jitter()
+                self.image_processing_module.jitter()
+                self.patch_processing_module.jitter()
                 
                 first_target_proba, attacked = self.attack(image)
                 self.target_proba_train[epoch].append(first_target_proba)
@@ -163,19 +159,19 @@ class PatchTrainer():
                     if first_target_proba <= self.threshold : 
                         success += 1
 
-                if total % c.N_ENREG_IMG == 0:
+                if total % c.consts["N_ENREG_IMG"] == 0:
                     torchvision.utils.save_image(image, 
-                                                 c.PATH_IMG_FOLDER + 
+                                                 c.consts["PATH_IMG_FOLDER"] + 
                                                  'epoch%d_image%d_label%d_original.png'
                                                  % (epoch, total, int(true_label)))
 
                     torchvision.utils.save_image(attacked, 
-                                                 c.PATH_IMG_FOLDER + 
+                                                 c.consts["PATH_IMG_FOLDER"] + 
                                                  'epoch%d_image%d_attacked.png'
                                                  % (epoch, total))
 
                     torchvision.utils.save_image(self.patch, 
-                                                 c.PATH_IMG_FOLDER + 
+                                                 c.consts["PATH_IMG_FOLDER"] + 
                                                  'epoch%d_image%d_patch.png'
                                                  % (epoch, total))
                     
@@ -188,9 +184,9 @@ class PatchTrainer():
     def test(self, epoch=-1):
         total, success = 0, 0
         for image, true_label in self.test_loader:
-            self.extrinsic_module.jitter()
-            self.intrinsic_module.jitter()
-            vector_scores = self.model(self.extrinsic_module(image))
+            self.image_processing_module.jitter()
+            self.patch_processing_module.jitter()
+            vector_scores = self.model(self.image_processing_module(image))
             model_label = int(torch.argmax(vector_scores))
             if model_label != int(true_label) :
                 continue
@@ -204,9 +200,9 @@ class PatchTrainer():
             
             transformed, _ = self.transformation_tool.random_transform(self.patch)
             mask = self._get_mask(transformed)
-            modified = self.intrinsic_module(transformed)
+            modified = self.patch_processing_module(transformed)
             attacked = torch.mul(1 - mask, image) + torch.mul(mask, modified)
-            normalized = self.extrinsic_module(attacked)
+            normalized = self.image_processing_module(attacked)
             vector_scores = self.model(normalized)
             attacked_label = int(torch.argmax(vector_scores))
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
@@ -219,8 +215,8 @@ class PatchTrainer():
                 if attacked_label != self.target_class: 
                     success += 1
 
-            if total % c.N_ENREG_IMG == 0:
-                torchvision.utils.save_image(normalized, c.PATH_IMG_FOLDER + 
+            if total % c.consts["N_ENREG_IMG"] == 0:
+                torchvision.utils.save_image(normalized, c.consts["PATH_IMG_FOLDER"] + 
                                              'test_epoch%d_target_proba%.2f_label%d.png'
                                              % (epoch, target_proba, attacked_label))
             self.pretty_printer.update_test(epoch, 100 * success / float(total), 
@@ -230,6 +226,7 @@ class PatchTrainer():
         self.success_rate_test[epoch] = 100 * (success / float(total))
 
     def save_patch(self, path):
+        self.consts = c.consts
         self.model = None
         self.train_loader = None
         self.test_loader = None

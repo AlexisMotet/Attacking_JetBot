@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import utils.utils as u
 import torchvision
 import random
-import image_transformation.image_transformation as img_transfo
+import image_processing.image_processing as i
 
 
 def tensor_to_array(tensor):
@@ -87,34 +87,34 @@ class ImageTransformation(unittest.TestCase):
             plt.pause(1)
         plt.show()
         
-    def test_intrinsic(self):
-        intrinsic_module = img_transfo.IntrisicModule()
+    def test_patch_processing_module(self):
+        patch_processing_module = img_transfo.IntrisicModule()
         _, (ax1, ax2) = plt.subplots(1, 2)
         img = torch.zeros(1, 3, 224, 224)
         img[0, :, 112-40:112+40, 112-40:112+40] = torch.rand(3, 80, 80)
-        plt.suptitle("TEST INTRINSIC")
+        plt.suptitle("TEST patch_processing_module")
         for _ in range(100):
-            intrinsic_module.jitter()
+            patch_processing_module.jitter()
             ax1.imshow(tensor_to_array(img), interpolation='nearest')
             ax1.set_title('original patch')
-            ax2.imshow(tensor_to_array(intrinsic_module(img)), 
+            ax2.imshow(tensor_to_array(patch_processing_module(img)), 
                        interpolation='nearest')
-            ax2.set_title('intrinsic modif patch')
+            ax2.set_title('patch_processing_module modif patch')
 
             plt.pause(1)
         plt.show()
         
     def test_extrinsic(self):
-        extrinsic_module = img_transfo.ExtrinsicModule(normalize=False)
+        image_processing_module = img_transfo.ExtrinsicModule(normalize=False)
         _, (ax1, ax2) = plt.subplots(1, 2)
         img = torch.zeros(1, 3, 224, 224)
         img[0, :, 112-40:112+40, 112-40:112+40] = torch.rand(3, 80, 80)
         plt.suptitle("TEST EXTRINSIC")
         for _ in range(100):
-            extrinsic_module.jitter()
+            image_processing_module.jitter()
             ax1.imshow(tensor_to_array(img), interpolation='nearest')
             ax1.set_title('original patch')
-            ax2.imshow(tensor_to_array(extrinsic_module(img)), 
+            ax2.imshow(tensor_to_array(image_processing_module(img)), 
                        interpolation='nearest')
             ax2.set_title('extrinsic modif patch')
 
@@ -122,18 +122,18 @@ class ImageTransformation(unittest.TestCase):
         plt.show()
         
     def test_global(self):
-        intrinsic_module = img_transfo.IntrisicModule()
-        extrinsic_module = img_transfo.ExtrinsicModule(normalize=False)
+        patch_processing_module = img_transfo.IntrisicModule()
+        image_processing_module = img_transfo.ExtrinsicModule(normalize=False)
         _, (ax1, ax2) = plt.subplots(1, 2)
         img = torch.zeros(1, 3, 224, 224)
         img[0, :, 112-40:112+40, 112-40:112+40] = torch.rand(3, 80, 80)
         plt.suptitle("TEST GLOBAL")
         for _ in range(100):
-            intrinsic_module.jitter()
-            extrinsic_module.jitter()
+            patch_processing_module.jitter()
+            image_processing_module.jitter()
             ax1.imshow(tensor_to_array(img), interpolation='nearest')
             ax1.set_title('original patch')
-            ax2.imshow(tensor_to_array(extrinsic_module(intrinsic_module(img))), 
+            ax2.imshow(tensor_to_array(image_processing_module(patch_processing_module(img))), 
                        interpolation='nearest')
             ax2.set_title('extrinsic modif patch')
 
@@ -159,23 +159,23 @@ class Trainer(unittest.TestCase):
         plt.suptitle("TEST ATTACK")
         trainer = self.patch_trainer
         for img, true_label in trainer.train_loader:
-            vector_scores = trainer.model(trainer.extrinsic_module(img))
+            vector_scores = trainer.model(trainer.image_processing_module(img))
             model_label = int(torch.argmax(vector_scores))
             if model_label != int(true_label) :
                 continue
             elif model_label == trainer.target_class:
                 continue
-            trainer.extrinsic_module.jitter()
-            trainer.intrinsic_module.jitter()
+            trainer.image_processing_module.jitter()
+            trainer.patch_processing_module.jitter()
             transformed, map_ = trainer.transformation_tool.random_transform(trainer.patch)
             mask =  trainer._get_mask(transformed)
             transformed.requires_grad = True
             for i in range(trainer.max_iterations + 1) :
                 torch.clamp(transformed, 0, 1)
-                modified = trainer.intrinsic_module(transformed)
+                modified = trainer.patch_processing_module(transformed)
                 attacked = torch.mul(1 - mask, img) + \
                         torch.mul(mask, modified)
-                normalized = trainer.extrinsic_module(attacked)
+                normalized = trainer.image_processing_module(attacked)
                 vector_scores = trainer.model(normalized)
                 vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
                 target_proba = float(vector_proba[0, trainer.target_class])

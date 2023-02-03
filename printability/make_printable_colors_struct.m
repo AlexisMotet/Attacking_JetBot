@@ -1,5 +1,5 @@
 % https://github.com/mahmoods01/accessorize-to-a-crime/tree/master/aux/attack
-function printable_vals = make_printable_vals_struct(printed_im_path, num_colors)
+function printable_colors = make_printable_colors_struct(printed_im_path, num_colors)
 % Make a Nx3 matrix of all the RGB values that exist in a printed
 % image (preferably a printed palette that covers a large portion
 % of the RGB space).
@@ -12,16 +12,16 @@ function printable_vals = make_printable_vals_struct(printed_im_path, num_colors
     cut_v = round(0.015*size(printed_im,1));
     printed_im = printed_im(1+cut_v-1:end-cut_v, 1+cut_h-1:end-cut_h, :);
 
-    % the printable_vals matrix is actually the color map found with the
+    % the printable_colors matrix is actually the color map found with the
     % minimum variance approach
     if nargin==1
-        [~,printable_vals] = rgb2ind(printed_im, 1024);
+        [~,printable_colors] = rgb2ind(printed_im, 1024);
     else
-        [~,printable_vals] = rgb2ind(printed_im, num_colors);
+        [~,printable_colors] = rgb2ind(printed_im, num_colors);
     end
     
     % {0,...,255} range and sort by column
-    printable_vals = round(printable_vals*255);
-    printable_vals = sortrows(printable_vals);
+    printable_colors = round(printable_colors*255);
+    printable_colors = sortrows(printable_colors);
 
 end
