@@ -16,8 +16,8 @@ def tensor_to_array(tensor):
 
 class ImageTransformation(unittest.TestCase):
     def setUp(self):
-        self.train_loader, _ = u.load_dataset(c.PATH_DATASET)
-        self.normalize = torchvision.transforms.Normalize(mean=c.MEAN, std=c.STD)
+        self.train_loader, _ = u.load_dataset(c.consts["PATH_DATASET"])
+        self.normalize = torchvision.transforms.Normalize(mean=c.consts["MEAN"], std=c.consts["STD"])
 
     def test_normalization(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
@@ -88,7 +88,7 @@ class ImageTransformation(unittest.TestCase):
         plt.show()
         
     def test_patch_processing_module(self):
-        patch_processing_module = img_transfo.IntrisicModule()
+        patch_processing_module = i.PatchProcessingModule()
         _, (ax1, ax2) = plt.subplots(1, 2)
         img = torch.zeros(1, 3, 224, 224)
         img[0, :, 112-40:112+40, 112-40:112+40] = torch.rand(3, 80, 80)

@@ -1,5 +1,6 @@
 from enum import Enum
 import numpy as np
+import torch
 import json
 
 path = "C:\\Users\\alexi\\PROJET_3A\\"
@@ -22,7 +23,7 @@ consts = {
                                         [0, 0, 0, 1]])),
     "ANGLES_RANGE" : 0,
     "SCALE_FACTOR_MIN" : 1,
-    "NOISE_INTENSITY" : 0.1,
+    "NOISE_STD" : np.array([0.06951714, 0.08960456, 0.14701256]),
     "BLUR_KERNEL_SIZE" : 5,
     "BLUR_SIGMA_MAX" : 0.5,
     "BRIGHTNESS_BIAS" : 0.25,

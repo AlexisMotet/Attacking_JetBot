@@ -3,9 +3,6 @@ import numpy as np
 import constants.constants as c
 import torch
 
-import utils.utils as u
-import scipy
-
 
 class TransformationTool():
     def __init__(self, patch_dim):
