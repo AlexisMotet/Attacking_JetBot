@@ -51,6 +51,11 @@ class PatchWidget(QWidget):
         button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
         vbox.addWidget(button)
         
+        button_consts = QPushButton("See Constants")
+        button_consts.clicked.connect(self.see_constants)
+        button_consts.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
+        vbox.addWidget(button_consts)
+        
         
         for attr in attributes :
             name, val = attr.get_tuple(patch_trainer)
@@ -99,6 +104,15 @@ class PatchWidget(QWidget):
     def save_patch_as_image(self):
         filename = QFileDialog.getSaveFileName(filter="*.png")
         torchvision.utils.save_image(self.patch_trainer.patch, filename[0])
+        
+    def see_constants(self):
+        message_box = QMessageBox(self)
+        message_box.setWindowTitle("Constants")
+        text = ""
+        for key, value in self.patch_trainer.consts.items() :
+            text += "%s : %s\n" % (str(key), str(value))
+        message_box.setText(text)
+        message_box.exec_()
         
 class MainWindow(QMainWindow):
     class ThreadAlive(Exception):

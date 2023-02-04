@@ -20,7 +20,7 @@ consts = {
                                         [-0.0035, 0.9855, 0.1699, 0],
                                         [0.0252, -0.1697, 0.9852, 0],
                                         [0, 0, 0, 1]])),
-    "ANGLES_RANGE" : 0.3,
+    "ANGLES_RANGE" : 0,
     "SCALE_FACTOR_MIN" : 1,
     "NOISE_INTENSITY" : 0.1,
     "BLUR_KERNEL_SIZE" : 5,
@@ -34,7 +34,7 @@ consts = {
     "STD" : [0.229, 0.224, 0.225],
     "LIMIT_TRAIN_EPOCH_LEN" : None,
     "LIMIT_TEST_LEN" : None,
-    "N_ENREG_IMG" : 5,
+    "N_ENREG_IMG" : 40,
 }
 
 
@@ -43,7 +43,3 @@ class Mode(Enum):
     TARGET_AND_FLEE = 2
     FLEE = 3
 
-class RandomMode(Enum):
-    FULL_RANDOM = 1
-    TRAIN_KMEANS = 2
-    TRAIN_TEST_KMEANS = 3

@@ -2,39 +2,53 @@ import torch
 import torchvision
 import datetime
 import image_processing.image_processing as i
-import pickle
 import utils.utils as u
 import constants.constants as c
 import transformation.transformation as t
+import printability.new_printability as pt
+import total_variation.new_total_variation as tv
+import pickle
+
 
 class PatchTrainer():
     def __init__(self, mode=c.Mode.TARGET, validation=True, 
                  target_class=1, patch_relative_size=0.08, n_epochs=2, 
+                 lambda_tv=0, lambda_print=0,
                  threshold=0.9, max_iterations=10):
 
         self.pretty_printer = u.PrettyPrinter(self)
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        self.path_model = c.consts["PATH_MODEL"]
+        self.path_dataset = c.consts["PATH_DATASET"] 
+        self.limit_train_epoch_len = c.consts["LIMIT_TRAIN_EPOCH_LEN"]
+        self.limit_test_len = c.consts["LIMIT_TEST_LEN"]
         self.mode = mode
         self.validation = validation
         self.target_class = target_class
         self.patch_relative_size = patch_relative_size
+        self.lambda_tv = lambda_tv
+        self.lambda_print = lambda_print
         self.n_epochs = n_epochs
         self.threshold = threshold
         self.max_iterations = max_iterations
 
-        self.model = u.load_model(c.consts["PATH_MODEL"], n_classes=c.consts["N_CLASSES"])
+        self.model = u.load_model(self.path_model, n_classes=c.consts["N_CLASSES"])
         self.model.eval()
-        self.train_loader, self.test_loader = u.load_dataset(c.consts["PATH_DATASET"])
+        self.train_loader, self.test_loader = u.load_dataset(self.path_dataset)
 
         image_size = c.consts["IMAGE_DIM"] ** 2
         patch_size = image_size * self.patch_relative_size
         self.patch_dim = int(patch_size ** (0.5))
+        if self.patch_dim % 2 != 0 :
+            self.patch_dim -= 1
 
         self.image_processing_module = i.ImageProcessingModule()
-        
         self.patch_processing_module = i.PatchProcessingModule()
         
         self.transformation_tool = t.TransformationTool(self.patch_dim)
+        
+        self.print_module = pt.PrintabilityModule(self.patch_dim)
+        self.tv_module = tv.TotalVariationModule()
         
         self.patch = self._random_patch_init()
 
@@ -45,7 +59,7 @@ class PatchTrainer():
         patch = torch.zeros(1, 3, c.consts["IMAGE_DIM"], c.consts["IMAGE_DIM"])
         row0, col0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
                      c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
-        patch[0, :, row0:row0 + self.patch_dim, 
+        patch[:, :, row0:row0 + self.patch_dim, 
                     col0:col0 + self.patch_dim] = torch.rand(3, self.patch_dim, 
                                                                 self.patch_dim)
         return patch
@@ -71,6 +85,23 @@ class PatchTrainer():
                      c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
         return self.patch[:, :, row0:row0 + self.patch_dim, 
                                 col0:col0 + self.patch_dim]
+        
+    def _apply_specific_grads(self):
+        patch = self._get_patch()
+        patch.requires_grad = True    
+        loss = self.print_module(patch)
+        loss.backward()
+        print_grad = patch.grad.clone()
+        patch.grad.zero_()
+        loss = self.tv_module(patch)
+        loss.backward()
+        tv_grad = patch.grad
+        patch.requires_grad = False
+        patch -= self.lambda_tv * tv_grad + self.lambda_print * print_grad 
+        row0, col0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
+                     c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
+        self.patch[:, :, row0:row0 + self.patch_dim, 
+                         col0:col0 + self.patch_dim] = patch
 
     def attack(self, image):
         transformed, map_ = self.transformation_tool.random_transform(self.patch)
@@ -118,6 +149,7 @@ class PatchTrainer():
         self.patch = self.transformation_tool.undo_transform(self.patch, 
                                                              transformed.detach(),
                                                              map_)
+        self._apply_specific_grads()
         return first_target_proba, attacked
 
     def train(self):

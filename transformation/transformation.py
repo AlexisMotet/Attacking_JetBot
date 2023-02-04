@@ -11,13 +11,6 @@ class TransformationTool():
     def __init__(self, patch_dim):
         self.patch_dim = patch_dim
 
-        fx, fy = 108, 139
-        cx, cy = 107, 112
-
-        self.k1 = -0.2397
-        self.k2 = 0.0341
-        self.k3 = 0
-
         self.matrix_2dto3d = np.array([[1/c.consts["FX"], 0, -c.consts["CX"]/c.consts["FX"]],
                                        [0, 1/c.consts["FY"], -c.consts["CY"]/c.consts["FY"]],
                                        [0, 0, 0],
@@ -63,8 +56,6 @@ class TransformationTool():
         transformed = torch.zeros_like(image)
         map_ = {}
         save = {}
-        map_x = []
-        map_y = []
         for i in range(c.consts["IMAGE_DIM"]//2-self.patch_dim//2, 
                        c.consts["IMAGE_DIM"]//2+self.patch_dim//2):
             for j in range(c.consts["IMAGE_DIM"]//2-self.patch_dim//2, 
@@ -75,7 +66,7 @@ class TransformationTool():
                 ti, tj = point_transformed[:2]
                 
                 r2 = pow(ti, 2) + pow(tj, 2)
-                d = 1/(1 - (self.k1*r2 + self.k2*r2 + self.k3*r2))
+                d = 1/(1 - (c.consts["K1"]*r2 + c.consts["K2"]*r2))
                 di = ti * d
                 dj = tj * d
                 point_distorted = point_transformed.copy()
@@ -119,6 +110,7 @@ class TransformationTool():
         return self._transform(image, mtx_transfo)
             
     def undo_transform(self, image, transformed, map_):
+        new_image = image.clone()
         for i in range(c.consts["IMAGE_DIM"]//2-self.patch_dim//2, 
                        c.consts["IMAGE_DIM"]//2+self.patch_dim//2):
             for j in range(c.consts["IMAGE_DIM"]//2-self.patch_dim//2, 
@@ -126,5 +118,5 @@ class TransformationTool():
                 if (j, i) in map_ :
                     nj, ni = map_[(j, i)]
                     if 0 <= ni < c.consts["IMAGE_DIM"] and 0 <= nj <  c.consts["IMAGE_DIM"] :
-                        image[0, :, j, i] = transformed[0, :, nj, ni]
-        return image
+                        new_image[0, :, j, i] = transformed[0, :, nj, ni]
+        return new_image

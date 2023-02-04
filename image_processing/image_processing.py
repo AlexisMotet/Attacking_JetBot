@@ -15,13 +15,13 @@ class PatchProcessingModule(torch.nn.Module):
                                                                      c.consts["IMAGE_DIM"])
         self.order = random.getrandbits(1)
         
-    def forward(self, image):
+    def forward(self, patch):
         if self.order : 
-            blurred = gaussian_blur(image, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
+            blurred = gaussian_blur(patch, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
                                     sigma=self.sigma_blur)
             modified = blurred + self.noise
         else :
-            noisy = image + self.noise
+            noisy = patch + self.noise
             modified = gaussian_blur(noisy, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
                                     sigma=self.sigma_blur)
         return modified

@@ -142,7 +142,7 @@ class ImageTransformation(unittest.TestCase):
 
 class Trainer(unittest.TestCase):
     def setUp(self):
-        self.patch_trainer = new_patch.PatchTrainer(patch_relative_size=0.05)
+        self.patch_trainer = new_patch.PatchTrainer(patch_relative_size=0.05, lambda_tv=0.001, lambda_print=0.025)
                                                     
     def test_transformation(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
@@ -155,7 +155,7 @@ class Trainer(unittest.TestCase):
             plt.pause(0.5)
             
     def test_attack(self):
-        _, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
+        _, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5)
         plt.suptitle("TEST ATTACK")
         trainer = self.patch_trainer
         for img, true_label in trainer.train_loader:
@@ -184,14 +184,15 @@ class Trainer(unittest.TestCase):
                 with torch.no_grad():
                     transformed -= transformed.grad
                 transformed.grad.zero_()
-                print(target_proba)
             ax1.imshow(u.tensor_to_array(img))
             ax2.imshow(u.tensor_to_array(transformed))
             ax3.imshow(u.tensor_to_array(modified))
             ax4.imshow(u.tensor_to_array(attacked))
-            self.patch = trainer.transformation_tool.undo_transform(trainer.patch, 
-                                                            transformed.detach(),
-                                                            map_)
+            trainer.patch = trainer.transformation_tool.undo_transform(trainer.patch, 
+                                                       transformed.detach(),
+                                                       map_)
+            trainer._apply_specific_grads()
+            ax5.imshow(u.tensor_to_array(trainer.patch))
             plt.pause(0.1)
         
     
