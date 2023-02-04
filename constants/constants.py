@@ -1,9 +1,10 @@
 from enum import Enum
 import numpy as np
-import torch
-import json
+import math
 
+path = "U:\\PROJET_3A\\"
 path = "C:\\Users\\alexi\\PROJET_3A\\"
+
 
 consts = {
     "PATH_MODEL" : path + 'Projet_Adversarial_Patch\\Project_Adverserial_Patch\\Collision_Avoidance\\best_model_extended.pth',
@@ -11,18 +12,18 @@ consts = {
     "PATH_DATASET" : path + 'Projet_Adversarial_Patch\\Project_Adverserial_Patch\\Collision_Avoidance\\dataset\\',
     "PATH_IMG_FOLDER" : path +  "projet_3A\\images\\",
     "PATH_PRINTABLE_COLORS" : path +  "projet_3A\\printability\\printable_colors.txt",
-    "FX" : 108,
-    "FY" : 139,
-    "CX" : 107,
-    "CY" : 112,
-    "K1" : -0.2397,
-    "K2" : 0.0341,
-    "EXTRINSIC_R" : np.linalg.inv(np.array([[0.997, 0.0077, -0.0243, 0],
-                                        [-0.0035, 0.9855, 0.1699, 0],
-                                        [0.0252, -0.1697, 0.9852, 0],
+    "FX" : 107.75,
+    "FY" : 138.46,
+    "CX" : 107.06,
+    "CY" : 112.53,
+    "K1" : -0.2388,
+    "K2" : 0.0337,
+    "EXTRINSIC_R" : np.linalg.inv(np.array([[0.9997, 0.0078, -0.0247, 0],
+                                        [-0.0034, 0.9849, 0.1729, 0],
+                                        [0.0257, -0.1728, 0.9846, 0],
                                         [0, 0, 0, 1]])),
-    "ANGLES_RANGE" : 0,
-    "SCALE_FACTOR_MIN" : 1,
+    "ANGLES_RANGE" : math.radians(15),
+    "SCALE_FACTOR_MIN" : 0.8,
     "NOISE_STD" : np.array([0.06951714, 0.08960456, 0.14701256]),
     "BLUR_KERNEL_SIZE" : 5,
     "BLUR_SIGMA_MAX" : 0.5,
