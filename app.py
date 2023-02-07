@@ -56,7 +56,6 @@ class PatchWidget(QWidget):
         button_consts.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
         vbox.addWidget(button_consts)
         
-        
         for attr in attributes :
             name, val = attr.get_tuple(patch_trainer)
             h = QHBoxLayout()
@@ -72,7 +71,10 @@ class PatchWidget(QWidget):
         if not patch_trainer.validation :
             vbox_plot.addWidget(QLabel("Success rate %.2f%%"
                                        % patch_trainer.success_rate_test[-1]))
-        for e in patch_trainer.target_proba_train.keys() :
+        for i, e in enumerate(patch_trainer.target_proba_train.keys()) :
+            if patch_trainer.n_epochs > 5 :
+                if i%2 == 1 and i!=patch_trainer.n_epochs - 1:
+                    continue
             color = random_color()
             if patch_trainer.validation :
                 plot = self.create_plot_item("Train epoch %d - "

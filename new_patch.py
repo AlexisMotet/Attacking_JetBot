@@ -10,9 +10,10 @@ import total_variation.new_total_variation as tv
 import pickle
 
 
+
 class PatchTrainer():
     def __init__(self, mode=c.Mode.TARGET, validation=True, 
-                 target_class=1, patch_relative_size=0.08, n_epochs=2, 
+                 target_class=1, patch_relative_size=0.05, n_epochs=2, 
                  lambda_tv=0, lambda_print=0,
                  threshold=0.9, max_iterations=10):
 
@@ -42,7 +43,7 @@ class PatchTrainer():
         if self.patch_dim % 2 != 0 :
             self.patch_dim -= 1
 
-        self.image_processing_module = i.ImageProcessingModule()
+        self.image_processing_module = i.ImageProcessingModule(normalize=True)
         self.patch_processing_module = i.PatchProcessingModule()
         
         self.transformation_tool = t.TransformationTool(self.patch_dim)
@@ -61,7 +62,7 @@ class PatchTrainer():
                      c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
         patch[:, :, row0:row0 + self.patch_dim, 
                     col0:col0 + self.patch_dim] = torch.rand(3, self.patch_dim, 
-                                                                self.patch_dim)
+                                                                self.patch_dim) + 1e-5
         return patch
     
     def test_model(self):
@@ -102,13 +103,18 @@ class PatchTrainer():
                      c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
         self.patch[:, :, row0:row0 + self.patch_dim, 
                          col0:col0 + self.patch_dim] = patch
-
+    
+    def _prevent_zeros(self):
+        row0, col0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
+                     c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
+        self.patch[:, :, row0:row0 + self.patch_dim, 
+                         col0:col0 + self.patch_dim] += 1e-5
+        
     def attack(self, image):
         transformed, map_ = self.transformation_tool.random_transform(self.patch)
         mask = self._get_mask(transformed)
         transformed.requires_grad = True
         for i in range(self.max_iterations + 1) :
-            torch.clamp(transformed, 0, 1)
             modified = self.patch_processing_module(transformed)
             attacked = torch.mul(1 - mask, image) + \
                        torch.mul(mask, modified)
@@ -146,11 +152,14 @@ class PatchTrainer():
                     with torch.no_grad():    
                         transformed += transformed.grad
             transformed.grad.zero_()
+            with torch.no_grad():
+                transformed.clamp_(0, 1)
         self.patch = self.transformation_tool.undo_transform(self.patch, 
                                                              transformed.detach(),
                                                              map_)
         self._apply_specific_grads()
-        return first_target_proba, attacked
+        self._prevent_zeros()
+        return first_target_proba, normalized
 
     def train(self):
         self.pretty_printer.training()
@@ -264,4 +273,4 @@ class PatchTrainer():
         self.test_loader = None
         self.patch = self._get_patch()
         pickle.dump(self, open(path, "wb"))
-
+        

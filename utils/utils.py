@@ -11,6 +11,7 @@ def tensor_to_array(tensor):
     return array
 
 def array_to_tensor(array):
+    array = array.astype(np.float32)
     array = np.transpose(array, (2, 0, 1))
     array = array[np.newaxis, :]
     return torch.tensor(array)
