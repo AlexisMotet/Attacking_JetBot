@@ -1,5 +1,6 @@
 import torch
 from torchvision.transforms import Normalize
+from torchvision.transforms.functional import gaussian_blur
 import constants.constants as c
 import random
 import numpy as np
@@ -11,14 +12,22 @@ class PatchProcessingModule(torch.nn.Module):
         self.jitter()
         
     def jitter(self):
+        self.sigma_blur = float(torch.rand(1) * c.consts["BLUR_SIGMA_MAX"] + 1e-5)
         self.noise = u.array_to_tensor(c.consts["NOISE_STD"] * np.random.standard_normal((
                                                                        c.consts["IMAGE_DIM"], 
                                                                        c.consts["IMAGE_DIM"], 3)))
         self.order = random.getrandbits(1)
         
     def forward(self, patch):
-        noisy = patch + self.noise
-        return noisy
+        if self.order : 
+            blurred = gaussian_blur(patch, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
+                                    sigma=self.sigma_blur)
+            modified = blurred + self.noise
+        else :
+            noisy = patch + self.noise
+            modified = gaussian_blur(noisy, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
+                                    sigma=self.sigma_blur)
+        return modified
 
 
 class ImageProcessingModule(torch.nn.Module):

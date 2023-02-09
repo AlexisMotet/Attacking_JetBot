@@ -10,7 +10,6 @@ import total_variation.new_total_variation as tv
 import pickle
 
 
-
 class PatchTrainer():
     def __init__(self, mode=c.Mode.TARGET, validation=True, 
                  target_class=1, patch_relative_size=0.05, n_epochs=2, 
@@ -42,6 +41,9 @@ class PatchTrainer():
         self.patch_dim = int(patch_size ** (0.5))
         if self.patch_dim % 2 != 0 :
             self.patch_dim -= 1
+            
+        self.r0, self.c0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
+                           c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
 
         self.image_processing_module = i.ImageProcessingModule(normalize=True)
         self.patch_processing_module = i.PatchProcessingModule()
@@ -58,11 +60,9 @@ class PatchTrainer():
 
     def _random_patch_init(self):
         patch = torch.zeros(1, 3, c.consts["IMAGE_DIM"], c.consts["IMAGE_DIM"])
-        row0, col0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
-                     c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
-        patch[:, :, row0:row0 + self.patch_dim, 
-                    col0:col0 + self.patch_dim] = torch.rand(3, self.patch_dim, 
-                                                                self.patch_dim) + 1e-5
+        patch[:, :, self.r0:self.r0 + self.patch_dim, 
+                    self.c0:self.c0 + self.patch_dim] = torch.rand(3, self.patch_dim, 
+                                                                      self.patch_dim) + 1e-9
         return patch
     
     def test_model(self):
@@ -82,10 +82,8 @@ class PatchTrainer():
         return mask
     
     def _get_patch(self):
-        row0, col0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
-                     c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
-        return self.patch[:, :, row0:row0 + self.patch_dim, 
-                                col0:col0 + self.patch_dim]
+        return self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
+                                self.c0:self.c0 + self.patch_dim]
         
     def _apply_specific_grads(self):
         patch = self._get_patch()
@@ -99,16 +97,12 @@ class PatchTrainer():
         tv_grad = patch.grad
         patch.requires_grad = False
         patch -= self.lambda_tv * tv_grad + self.lambda_print * print_grad 
-        row0, col0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
-                     c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
-        self.patch[:, :, row0:row0 + self.patch_dim, 
-                         col0:col0 + self.patch_dim] = patch
+        self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
+                         self.c0:self.c0 + self.patch_dim] = patch
     
     def _prevent_zeros(self):
-        row0, col0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
-                     c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
-        self.patch[:, :, row0:row0 + self.patch_dim, 
-                         col0:col0 + self.patch_dim] += 1e-5
+        self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
+                         self.c0:self.c0 + self.patch_dim] += 1e-9
         
     def attack(self, image):
         transformed, map_ = self.transformation_tool.random_transform(self.patch)
@@ -143,14 +137,13 @@ class PatchTrainer():
                     transformed += transformed.grad
             elif self.mode == c.Mode.TARGET_AND_FLEE:
                 loss[0, self.target_class].backward(retain_graph=True)
-                with torch.no_grad():
-                    transformed -= transformed.grad 
+                target_grad = transformed.grad.clone()
                 model_label = int(torch.argmax(vector_scores))
+                transformed.grad.zero_()
                 if model_label != self.target_class :
-                    transformed.grad.zero_()
                     loss[0, model_label].backward()
-                    with torch.no_grad():    
-                        transformed += transformed.grad
+                with torch.no_grad():
+                    transformed -= target_grad - transformed.grad
             transformed.grad.zero_()
             with torch.no_grad():
                 transformed.clamp_(0, 1)
