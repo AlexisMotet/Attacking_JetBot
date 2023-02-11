@@ -7,6 +7,10 @@ import torch
 class TransformationTool():
     def __init__(self, patch_dim):
         self.patch_dim = patch_dim
+        self.min_row = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
+        self.max_row = c.consts["IMAGE_DIM"]//2 + self.patch_dim//2 - 1
+        self.min_col = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
+        self.max_col = c.consts["IMAGE_DIM"]//2 + self.patch_dim//2 - 1
 
         self.matrix_2dto3d = np.array([[1/c.consts["FX"], 0, -c.consts["CX"]/c.consts["FX"]],
                                        [0, 1/c.consts["FY"], -c.consts["CY"]/c.consts["FY"]],
@@ -53,10 +57,8 @@ class TransformationTool():
         transformed = torch.zeros_like(image)
         map_ = {}
         save = {}
-        for i in range(c.consts["IMAGE_DIM"]//2-self.patch_dim//2, 
-                       c.consts["IMAGE_DIM"]//2+self.patch_dim//2):
-            for j in range(c.consts["IMAGE_DIM"]//2-self.patch_dim//2, 
-                           c.consts["IMAGE_DIM"]//2+self.patch_dim//2):
+        for i in range(self.min_row, self.max_row + 1):
+            for j in range(self.min_col, self.max_col + 1):
                 point_2d = np.array([i, j, 1])
                 point_3d = self.matrix_2dto3d@point_2d
                 point_transformed = mtx_transfo@point_3d
@@ -96,8 +98,8 @@ class TransformationTool():
         
         x_c, y_c = c.consts["IMAGE_DIM"]//2, c.consts["IMAGE_DIM"]//2
         
-        x_t, y_t = np.random.randint(-c.consts["IMAGE_DIM"]//2 + self.patch_dim//2, 
-                                      c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, 2)
+        x_t, y_t = np.random.randint(-x_c + self.patch_dim//2, 
+                                      x_c - self.patch_dim//2, 2)
         point_t = (1/scale_factor) * np.array([x_c + x_t, y_c + y_t, 1])
         nx_t, ny_t = (self.matrix_2dto3d@point_t)[:2]
         angles = np.zeros(3)
@@ -108,10 +110,8 @@ class TransformationTool():
             
     def undo_transform(self, image, transformed, map_):
         new_image = image.clone()
-        for i in range(c.consts["IMAGE_DIM"]//2-self.patch_dim//2, 
-                       c.consts["IMAGE_DIM"]//2+self.patch_dim//2):
-            for j in range(c.consts["IMAGE_DIM"]//2-self.patch_dim//2, 
-                           c.consts["IMAGE_DIM"]//2+self.patch_dim//2):
+        for i in range(self.min_row, self.max_row + 1):
+            for j in range(self.min_col, self.max_col + 1):
                 if (j, i) in map_ :
                     nj, ni = map_[(j, i)]
                     if 0 <= ni < c.consts["IMAGE_DIM"] and 0 <= nj <  c.consts["IMAGE_DIM"] :

@@ -55,6 +55,15 @@ def load_model(path_model, n_classes):
     model.load_state_dict(torch.load(path_model, map_location=torch.device("cpu")))
     return model
 
+def setup_config(config):
+    for key, value in config.items():
+        if key not in c.consts :
+            raise Exception("This key is not supported")
+        elif type(value) != type(c.consts[key]):
+            raise Exception("Expected type of the value for key %s is %s, got %s" % 
+                            (key, type(value), type(c.consts)))
+        c.consts[key] = value
+
 class Attribute():
     def __init__(self, name):
         self.name = name

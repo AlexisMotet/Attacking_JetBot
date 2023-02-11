@@ -11,11 +11,13 @@ import pickle
 
 
 class PatchTrainer():
-    def __init__(self, mode=c.Mode.TARGET, validation=True, 
+    def __init__(self, config=None, mode=c.Mode.TARGET, validation=True, 
                  target_class=1, patch_relative_size=0.05, n_epochs=2, 
                  lambda_tv=0, lambda_print=0,
                  threshold=0.9, max_iterations=10):
-
+        if config :
+            u.setup_config(config)
+        print(config)
         self.pretty_printer = u.PrettyPrinter(self)
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         self.path_model = c.consts["PATH_MODEL"]
@@ -60,9 +62,9 @@ class PatchTrainer():
 
     def _random_patch_init(self):
         patch = torch.zeros(1, 3, c.consts["IMAGE_DIM"], c.consts["IMAGE_DIM"])
+        rand = torch.rand(3, self.patch_dim, self.patch_dim) + 1e-5
         patch[:, :, self.r0:self.r0 + self.patch_dim, 
-                    self.c0:self.c0 + self.patch_dim] = torch.rand(3, self.patch_dim, 
-                                                                      self.patch_dim) + 1e-9
+                    self.c0:self.c0 + self.patch_dim] = rand
         return patch
     
     def test_model(self):
@@ -102,7 +104,7 @@ class PatchTrainer():
     
     def _prevent_zeros(self):
         self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
-                         self.c0:self.c0 + self.patch_dim] += 1e-9
+                         self.c0:self.c0 + self.patch_dim] += 1e-5
         
     def attack(self, image):
         transformed, map_ = self.transformation_tool.random_transform(self.patch)
