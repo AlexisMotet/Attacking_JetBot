@@ -2,16 +2,15 @@ from enum import Enum
 import numpy as np
 import math
 
-path = "U:\\PROJET_3A\\"
-path = "C:\\Users\\alexi\\PROJET_3A\\"
-
+path = "U:/PROJET_3A/"
+path = "C:/Users/alexi/PROJET_3A/"
 
 consts = {
-    "PATH_MODEL" : path + 'Projet_Adversarial_Patch\\Project_Adverserial_Patch\\Collision_Avoidance\\best_model_extended.pth',
+    "PATH_MODEL" : path + 'Projet_Adversarial_Patch/Project_Adverserial_Patch/Collision_Avoidance/best_model_extended.pth',
     "N_CLASSES" : 2,
-    "PATH_DATASET" : path + 'Projet_Adversarial_Patch\\Project_Adverserial_Patch\\Collision_Avoidance\\dataset\\',
-    "PATH_IMG_FOLDER" : path +  "projet_3A\\images\\",
-    "PATH_PRINTABLE_COLORS" : path +  "projet_3A\\printability\\printable_colors.txt",
+    "PATH_DATASET" : path + 'Projet_Adversarial_Patch/Project_Adverserial_Patch/Collision_Avoidance/dataset/',
+    "PATH_IMG_FOLDER" : path +  "projet_MOTET/images/",
+    "PATH_PRINTABLE_COLORS" : path +  "projet_MOTET/printability/printable_colors.txt",
     "FX" : 107.75,
     "FY" : 138.46,
     "CX" : 107.06,
