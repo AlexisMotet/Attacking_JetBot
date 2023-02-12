@@ -5,7 +5,7 @@ import constants.constants as c
 class PrintabilityModule(torch.nn.Module):
     def __init__(self, patch_dim):
         super().__init__()
-        _colors = np.loadtxt(c.consts["PATH_PRINTABLE_COLORS"], delimiter=";")
+        _colors = np.loadtxt("printable_colors.txt", delimiter=";")
         _colors = _colors/255
         ones = np.ones((1, 3, patch_dim, patch_dim))
         self.colors = torch.from_numpy((ones.T * _colors.T).T)

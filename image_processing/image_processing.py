@@ -16,18 +16,12 @@ class PatchProcessingModule(torch.nn.Module):
         self.noise = u.array_to_tensor(c.consts["NOISE_STD"] * np.random.standard_normal((
                                                                        c.consts["IMAGE_DIM"], 
                                                                        c.consts["IMAGE_DIM"], 3)))
-        self.order = random.getrandbits(1)
         
     def forward(self, patch):
-        if self.order : 
-            blurred = gaussian_blur(patch, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
-                                    sigma=self.sigma_blur)
-            modified = blurred + self.noise
-        else :
-            noisy = patch + self.noise
-            modified = gaussian_blur(noisy, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
-                                    sigma=self.sigma_blur)
-        return modified
+        blurred = gaussian_blur(patch, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
+                                        sigma=self.sigma_blur)
+        noisy = blurred + self.noise
+        return noisy
 
 
 class ImageProcessingModule(torch.nn.Module):
