@@ -21,11 +21,6 @@ class TransformationTool():
                                        [0, c.consts["FY"], c.consts["CY"], 0],
                                        [0, 0, 1, 0]])
         
-        self.r = np.linalg.inv(np.array([[0.997, 0.0077, -0.0243, 0],
-                                        [-0.0035, 0.9855, 0.1699, 0],
-                                        [0.0252, -0.1697, 0.9852, 0],
-                                        [0, 0, 0, 1]]))
-        
     def _get_matrix_transformation(self, x_t, y_t, scale_factor,
                                   alpha, beta, gamma):
         rx = np.array([[1, 0, 0, 0],
