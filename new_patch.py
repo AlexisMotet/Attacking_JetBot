@@ -15,15 +15,11 @@ class PatchTrainer():
                  target_class=1, patch_relative_size=0.05, n_epochs=2, 
                  lambda_tv=0, lambda_print=0,
                  threshold=0.9, max_iterations=10):
-        if config :
-            u.setup_config(config)
-        print(config)
         self.pretty_printer = u.PrettyPrinter(self)
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        self.path_model = c.consts["PATH_MODEL"]
-        self.path_dataset = c.consts["PATH_DATASET"] 
-        self.limit_train_epoch_len = c.consts["LIMIT_TRAIN_EPOCH_LEN"]
-        self.limit_test_len = c.consts["LIMIT_TEST_LEN"]
+        if config :
+            u.setup_config(config)
+        self.pretty_printer.print_config(config)
         self.mode = mode
         self.validation = validation
         self.target_class = target_class
@@ -34,9 +30,9 @@ class PatchTrainer():
         self.threshold = threshold
         self.max_iterations = max_iterations
 
-        self.model = u.load_model(self.path_model, n_classes=c.consts["N_CLASSES"])
+        self.model = u.load_model()
         self.model.eval()
-        self.train_loader, self.test_loader = u.load_dataset(self.path_dataset)
+        self.train_loader, self.test_loader = u.load_dataset()
 
         image_size = c.consts["IMAGE_DIM"] ** 2
         patch_size = image_size * self.patch_relative_size
@@ -110,6 +106,8 @@ class PatchTrainer():
         transformed, map_ = self.transformation_tool.random_transform(self.patch)
         mask = self._get_mask(transformed)
         transformed.requires_grad = True
+        if torch.cuda.is_available():
+            transformed = transformed.to(torch.device("cuda"))
         for i in range(self.max_iterations + 1) :
             modified = self.patch_processing_module(transformed)
             attacked = torch.mul(1 - mask, image) + \
@@ -162,6 +160,8 @@ class PatchTrainer():
             total, success = 0, 0
             self.target_proba_train[epoch] = []
             for image, true_label in self.train_loader:
+                if torch.cuda.is_available():
+                    image = image.to(torch.device("cuda"))
                 vector_scores = self.model(self.image_processing_module(image))
                 model_label = int(torch.argmax(vector_scores))
                 if model_label != int(true_label) :
@@ -211,8 +211,8 @@ class PatchTrainer():
                                                  'epoch%d_image%d_patch.png'
                                                  % (epoch, total))
                     
-                if self.limit_train_epoch_len is not None and \
-                        total >= self.limit_train_epoch_len :
+                if c.consts["LIMIT_TRAIN_EPOCH_LEN"] != -1 and \
+                        total >= c.consts["LIMIT_TRAIN_EPOCH_LEN"] :
                     break
             if self.validation:
                 self.test(epoch)
@@ -222,6 +222,8 @@ class PatchTrainer():
         for image, true_label in self.test_loader:
             self.image_processing_module.jitter()
             self.patch_processing_module.jitter()
+            if torch.cuda.is_available():
+                    image = image.to(torch.device("cuda"))
             vector_scores = self.model(self.image_processing_module(image))
             model_label = int(torch.argmax(vector_scores))
             if model_label != int(true_label) :
@@ -235,6 +237,8 @@ class PatchTrainer():
             total += 1
             
             transformed, _ = self.transformation_tool.random_transform(self.patch)
+            if torch.cuda.is_available():
+                    transformed = transformed.to(torch.device("cuda"))
             mask = self._get_mask(transformed)
             modified = self.patch_processing_module(transformed)
             attacked = torch.mul(1 - mask, image) + torch.mul(mask, modified)
@@ -257,7 +261,7 @@ class PatchTrainer():
                                              % (epoch, target_proba, attacked_label))
             self.pretty_printer.update_test(epoch, 100 * success / float(total), 
                                             total)
-            if self.limit_test_len is not None and total >= self.limit_test_len :
+            if c.consts["LIMIT_TEST_LEN"] != -1 and total >= c.consts["LIMIT_TEST_LEN"] :
                 break
         self.success_rate_test[epoch] = 100 * (success / float(total))
 

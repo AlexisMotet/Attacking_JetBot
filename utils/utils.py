@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import torchvision
 import constants.constants as c
+import pprint
 
 def tensor_to_array(tensor):
     tensor = torch.squeeze(tensor)
@@ -19,9 +20,9 @@ def array_to_tensor(array):
 def normalize_tensor(tensor):
     return tensor / torch.abs(torch.max(tensor))
 
-def load_dataset(path_dataset):
+def load_dataset():
     dataset = torchvision.datasets.ImageFolder(
-        path_dataset,
+        c.consts["PATH_DATASET"],
         torchvision.transforms.Compose([
             torchvision.transforms.RandomHorizontalFlip(),
             torchvision.transforms.Resize(c.consts["RESIZE_DIM"]),
@@ -49,10 +50,15 @@ def load_dataset(path_dataset):
     return train_loader, test_loader
 
 
-def load_model(path_model, n_classes):
-    model = torchvision.models.alexnet(pretrained=False)
-    model.classifier[6] = torch.nn.Linear(model.classifier[6].in_features, n_classes)
-    model.load_state_dict(torch.load(path_model, map_location=torch.device("cpu")))
+def load_model():
+    model = torchvision.models.alexnet(weights=None)
+    model.classifier[6] = torch.nn.Linear(model.classifier[6].in_features, c.consts["N_CLASSES"])
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        model.load_state_dict(torch.load(c.consts["PATH_MODEL"], map_location="cuda:0"))
+        model.to(device)
+    else :
+        model.load_state_dict(torch.load(c.consts["PATH_MODEL"], map_location=torch.device("cpu")))
     return model
 
 def setup_config(config):
@@ -61,7 +67,7 @@ def setup_config(config):
             raise Exception("This key is not supported")
         elif type(value) != type(c.consts[key]):
             raise Exception("Expected type of the value for key %s is %s, got %s" % 
-                            (key, type(value), type(c.consts)))
+                            (key, type(c.consts[key]), type(value)))
         c.consts[key] = value
 
 class Attribute():
@@ -75,15 +81,11 @@ class Attribute():
         return (self.name, self.get_attribute(patch_trainer))
 
 class PrettyPrinter():
-    def __init__(self, trainer, notebook=True):
+    def __init__(self, trainer):
         self.last_len = None
         self.saved = None
         self.trainer = trainer
         self.attributes = (Attribute("date"),
-                            Attribute("path_model"),
-                            Attribute("path_dataset"),
-                            Attribute("limit_train_epoch_len"),
-                            Attribute("limit_test_len"),
                             Attribute("target_class"),
                             Attribute("patch_relative_size"),
                             Attribute("n_epochs"),
@@ -103,21 +105,22 @@ class PrettyPrinter():
         print("==========================================")
         
     def update_test(self, epoch, success_rate, total):
-        txt = "[TEST] Epoch %02d - Success rate %1.3f%% - Image %03d " % (epoch, success_rate, total)
+        txt = "[TEST] Epoch %02d - SR %1.3f%% - Image %03d" % (epoch, success_rate, total)
         if len(txt) != self.last_len : self.clear()
         print(txt, end="\r")
         self.last_len = len(txt)
 
     def update_image(self, epoch, success_rate, total):
         if success_rate is None : 
-            self.saved = "[TRAINING] Epoch %02d - Success rate while training %s - Image %03d" % (epoch, success_rate, total)
+            self.saved = "[TRAINING] Epoch %02d - SR %s - Image %03d" % (epoch, success_rate, total)
         else :
-            self.saved = "[TRAINING] Epoch %02d - Success rate while training %3.3f%% - Image %03d" % (epoch, success_rate, total)
+            self.saved = "[TRAINING] Epoch %02d - SR %3.3f%% - Image %03d" % (epoch, success_rate, total)
 
     def update_iteration(self, i, target_proba):
         assert self.saved
-        txt = "%s - [ATTACK] Gradient descent iteration %03d - Target probability %1.3f" % (self.saved, i, target_proba)
-        if len(txt) != self.last_len : self.clear()
+        txt = "%s - [ATTACK] SGD iteration %03d - Target Probability %1.3f" % (self.saved, i, target_proba)
+        if len(txt) != self.last_len : 
+            self.clear()
         print(txt, end="\r")
         self.last_len = len(txt)
 
@@ -125,16 +128,8 @@ class PrettyPrinter():
         if self.last_len:
             spaces = " " * self.last_len
             print(spaces, end="\r")
-            
-"""
-if __name__ == "__main__":
-    import time
-    pretty_printer = PrettyPrinter(None)
-    pretty_printer.training()
-    for i in range(10):
-        pretty_printer.update_image(i,2)
-        for j in range(10):
-            pretty_printer.update_iteration(j)
-            time.sleep(0.4)
-    pretty_printer.test()
-"""
+        
+    def print_config(self, config):
+        print("================ CONFIG ==================")
+        pprint.pprint(config)
+        print("==========================================")
