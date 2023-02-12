@@ -36,3 +36,9 @@ config = {
     "LIMIT_TEST_LEN" : -1,
     "N_ENREG_IMG" : 20,
 }
+
+config_aws = config.copy()
+
+config_aws["PATH_MODEL"] = "../model.pth"
+config_aws["PATH_DATASET"] = "../dataset/"
+config_aws["PATH_IMG_FOLDER"] = "images/"
