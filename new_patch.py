@@ -98,10 +98,6 @@ class PatchTrainer():
         self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
                          self.c0:self.c0 + self.patch_dim] = patch
     
-    def _prevent_zeros(self):
-        self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
-                         self.c0:self.c0 + self.patch_dim] += 1e-5
-        
     def attack(self, image):
         transformed, map_ = self.transformation_tool.random_transform(self.patch)
         mask = self._get_mask(transformed)
@@ -124,7 +120,8 @@ class PatchTrainer():
                 if target_proba >= self.threshold : break    
             elif self.mode == c.Mode.FLEE :
                 if target_proba <= self.threshold : break
-            else : assert False
+            else : 
+                assert False
                 
             loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
             if self.mode == c.Mode.TARGET :
@@ -146,12 +143,11 @@ class PatchTrainer():
                     transformed -= target_grad - transformed.grad
             transformed.grad.zero_()
             with torch.no_grad():
-                transformed.clamp_(0, 1)
+                transformed.clamp_(1e-5, 1)
         self.patch = self.transformation_tool.undo_transform(self.patch, 
                                                              transformed.detach(),
                                                              map_)
         self._apply_specific_grads()
-        self._prevent_zeros()
         return first_target_proba, normalized
 
     def train(self):
