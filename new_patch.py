@@ -101,10 +101,10 @@ class PatchTrainer():
     def attack(self, image):
         transformed, map_ = self.transformation_tool.random_transform(self.patch)
         mask = self._get_mask(transformed)
-        transformed.requires_grad = True
         if torch.cuda.is_available():
             mask = mask.to(torch.device("cuda"))
             transformed = transformed.to(torch.device("cuda"))
+        transformed.requires_grad = True
         for i in range(self.max_iterations + 1) :
             modified = self.patch_processing_module(transformed)
             attacked = torch.mul(1 - mask, image) + \
