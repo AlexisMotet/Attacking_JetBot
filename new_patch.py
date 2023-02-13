@@ -148,6 +148,8 @@ class PatchTrainer():
         self.patch = self.transformation_tool.undo_transform(self.patch, 
                                                              transformed.detach(),
                                                              map_)
+        if torch.cuda.is_available():
+            self.patch = self.patch.to(torch.device("cuda"))
         self._apply_specific_grads()
         return first_target_proba, normalized
 
