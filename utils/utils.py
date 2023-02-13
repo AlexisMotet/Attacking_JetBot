@@ -107,7 +107,7 @@ class PrettyPrinter():
     def update_test(self, epoch, success_rate, total):
         txt = "[TEST] Epoch %02d - SR %1.3f%% - Image %03d" % (epoch, success_rate, total)
         if len(txt) != self.last_len : self.clear()
-        print(txt, end="\r")
+        print(txt)
         self.last_len = len(txt)
 
     def update_image(self, epoch, success_rate, total):
@@ -121,13 +121,13 @@ class PrettyPrinter():
         txt = "%s - [ATTACK] SGD iteration %03d - Target Probability %1.3f" % (self.saved, i, target_proba)
         if len(txt) != self.last_len : 
             self.clear()
-        print(txt, end="\r")
+        print(txt)
         self.last_len = len(txt)
 
     def clear(self):
         if self.last_len:
             spaces = " " * self.last_len
-            print(spaces, end="\r")
+            print(spaces)
         
     def print_config(self, config):
         print("================ CONFIG ==================")
