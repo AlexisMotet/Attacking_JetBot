@@ -36,8 +36,8 @@ config = {
     "N_ENREG_IMG" : 20,
 }
 
-config_aws = config.copy()
+config_colab = config.copy()
 
-config_aws["PATH_MODEL"] = "../model.pth"
-config_aws["PATH_DATASET"] = "../dataset/"
-config_aws["PATH_IMG_FOLDER"] = "images/"
+config_colab["PATH_MODEL"] = "/content/PROJET_3A/best_model_extended.pth"
+config_colab["PATH_DATASET"] = "/content/PROJET_3A/dataset/"
+config_colab["PATH_IMG_FOLDER"] = "images/"
