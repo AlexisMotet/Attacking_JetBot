@@ -9,6 +9,7 @@ config = {
     "N_CLASSES" : 2,
     "PATH_DATASET" : path + 'Projet_Adversarial_Patch/Project_Adverserial_Patch/Collision_Avoidance/dataset/',
     "PATH_IMG_FOLDER" : path +  "projet_MOTET/images/",
+    "PATH_PRINTABLE_COLORS" : path + "projet_MOTET/printability/printable_colors.txt",
     "FX" : 107.75,
     "FY" : 138.46,
     "CX" : 107.06,

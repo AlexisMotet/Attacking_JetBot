@@ -48,8 +48,9 @@ class TransformationTool():
         return matrix_transformation
 
     def _transform(self, image, mtx_transfo):
-        
         transformed = torch.zeros_like(image)
+        if torch.cuda.is_available():
+            transformed = transformed.to(torch.device("cuda"))
         map_ = {}
         save = {}
         for i in range(self.min_row, self.max_row + 1):
@@ -103,12 +104,12 @@ class TransformationTool():
         mtx_transfo = self._get_matrix_transformation(nx_t, ny_t, scale_factor, *angles)
         return self._transform(image, mtx_transfo)
             
-    def undo_transform(self, image, transformed, map_):
-        new_image = image.clone()
+    def undo_transform(self, patch, transformed, map_):
+        new_patch = patch.clone()
         for i in range(self.min_row, self.max_row + 1):
             for j in range(self.min_col, self.max_col + 1):
                 if (j, i) in map_ :
                     nj, ni = map_[(j, i)]
                     if 0 <= ni < c.consts["IMAGE_DIM"] and 0 <= nj <  c.consts["IMAGE_DIM"] :
-                        new_image[0, :, j, i] = transformed[0, :, nj, ni]
-        return new_image
+                        new_patch[0, :, j, i] = transformed[0, :, nj, ni]
+        return new_patch

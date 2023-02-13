@@ -8,10 +8,11 @@ import transformation.transformation as t
 import printability.new_printability as pt
 import total_variation.new_total_variation as tv
 import pickle
+from configs import config
 
 
 class PatchTrainer():
-    def __init__(self, config=None, mode=c.Mode.TARGET, validation=True, 
+    def __init__(self, config=config, mode=c.Mode.TARGET, validation=True, 
                  target_class=1, patch_relative_size=0.05, n_epochs=2, 
                  lambda_tv=0, lambda_print=0,
                  threshold=0.9, max_iterations=10):
@@ -58,17 +59,19 @@ class PatchTrainer():
 
     def _random_patch_init(self):
         patch = torch.zeros(1, 3, c.consts["IMAGE_DIM"], c.consts["IMAGE_DIM"])
+        if torch.cuda.is_available():
+            patch = patch.to(torch.device("cuda"))
         rand = torch.rand(3, self.patch_dim, self.patch_dim) + 1e-5
         patch[:, :, self.r0:self.r0 + self.patch_dim, 
                     self.c0:self.c0 + self.patch_dim] = rand
-        if torch.cuda.is_available():
-            patch = patch.to(torch.device("cuda"))
         return patch
     
     def test_model(self):
         success, total = 0, 0
         for loader in [self.train_loader, self.test_loader]:
             for image, label in loader:
+                if torch.cuda.is_available():
+                    image = image.to(torch.device("cuda"))
                 output = self.model(self.image_processing_module(image))
                 success += (label == output.argmax(1)).sum()
                 total += len(label)
@@ -78,6 +81,8 @@ class PatchTrainer():
     @staticmethod
     def _get_mask(image):
         mask = torch.zeros_like(image)
+        if torch.cuda.is_available():
+            mask = mask.to(torch.device("cuda"))
         mask[image != 0] = 1
         return mask
     
@@ -103,9 +108,6 @@ class PatchTrainer():
     def attack(self, image):
         transformed, map_ = self.transformation_tool.random_transform(self.patch)
         mask = self._get_mask(transformed)
-        if torch.cuda.is_available():
-            mask = mask.to(torch.device("cuda"))
-            transformed = transformed.to(torch.device("cuda"))
         transformed.requires_grad = True
         for i in range(self.max_iterations + 1) :
             modified = self.patch_processing_module(transformed)
@@ -219,8 +221,6 @@ class PatchTrainer():
     def test(self, epoch=-1):
         total, success = 0, 0
         for image, true_label in self.test_loader:
-            self.image_processing_module.jitter()
-            self.patch_processing_module.jitter()
             if torch.cuda.is_available():
                     image = image.to(torch.device("cuda"))
             vector_scores = self.model(self.image_processing_module(image))
@@ -235,11 +235,11 @@ class PatchTrainer():
             
             total += 1
             
+            self.image_processing_module.jitter()
+            self.patch_processing_module.jitter()
+            
             transformed, _ = self.transformation_tool.random_transform(self.patch)
             mask = self._get_mask(transformed)
-            if torch.cuda.is_available():
-                mask = mask.to(torch.device("cuda"))
-                transformed = transformed.to(torch.device("cuda"))
             modified = self.patch_processing_module(transformed)
             attacked = torch.mul(1 - mask, image) + torch.mul(mask, modified)
             normalized = self.image_processing_module(attacked)
