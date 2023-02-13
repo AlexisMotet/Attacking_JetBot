@@ -5,6 +5,7 @@ consts = {
     "PATH_MODEL" : "",
     "N_CLASSES" : int(),
     "PATH_DATASET" : "",
+    "PATH_PRINTABLE_COLORS" : "",
     "PATH_IMG_FOLDER" : "",
     "FX" : float(),
     "FY" : float(),
