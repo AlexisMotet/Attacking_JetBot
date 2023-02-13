@@ -41,3 +41,5 @@ config_colab = config.copy()
 config_colab["PATH_MODEL"] = "/content/PROJET_3A/best_model_extended.pth"
 config_colab["PATH_DATASET"] = "/content/PROJET_3A/dataset/"
 config_colab["PATH_IMG_FOLDER"] = "images/"
+config_colab["PATH_PRINTABLE_COLORS"] = "/content/projet_3A/printability/printable_colors.txt"
+
