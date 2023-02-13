@@ -16,7 +16,8 @@ class PatchProcessingModule(torch.nn.Module):
         self.noise = u.array_to_tensor(c.consts["NOISE_STD"] * np.random.standard_normal((
                                                                        c.consts["IMAGE_DIM"], 
                                                                        c.consts["IMAGE_DIM"], 3)))
-        
+        if torch.cuda.is_available():
+            self.noise = self.noise.to(torch.device("cuda"))
     def forward(self, patch):
         blurred = gaussian_blur(patch, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
                                         sigma=self.sigma_blur)

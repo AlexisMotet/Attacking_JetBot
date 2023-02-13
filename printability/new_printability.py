@@ -9,6 +9,8 @@ class PrintabilityModule(torch.nn.Module):
         _colors = _colors/255
         ones = np.ones((1, 3, patch_dim, patch_dim))
         self.colors = torch.from_numpy((ones.T * _colors.T).T)
+        if torch.cuda.is_available():
+            self.colors = self.colors.to(torch.device("cuda"))
         
     def forward(self, patch):
         delta = patch - self.colors[:, np.newaxis, :, :, :]
