@@ -103,6 +103,7 @@ class PatchTrainer():
         mask = self._get_mask(transformed)
         transformed.requires_grad = True
         if torch.cuda.is_available():
+            mask = mask.to(torch.device("cuda"))
             transformed = transformed.to(torch.device("cuda"))
         for i in range(self.max_iterations + 1) :
             modified = self.patch_processing_module(transformed)
@@ -233,9 +234,10 @@ class PatchTrainer():
             total += 1
             
             transformed, _ = self.transformation_tool.random_transform(self.patch)
-            if torch.cuda.is_available():
-                    transformed = transformed.to(torch.device("cuda"))
             mask = self._get_mask(transformed)
+            if torch.cuda.is_available():
+                mask = mask.to(torch.device("cuda"))
+                transformed = transformed.to(torch.device("cuda"))
             modified = self.patch_processing_module(transformed)
             attacked = torch.mul(1 - mask, image) + torch.mul(mask, modified)
             normalized = self.image_processing_module(attacked)
