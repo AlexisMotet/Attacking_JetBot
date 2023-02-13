@@ -14,8 +14,8 @@ class PatchProcessingModule(torch.nn.Module):
     def jitter(self):
         self.sigma_blur = float(torch.rand(1) * c.consts["BLUR_SIGMA_MAX"] + 1e-5)
         self.noise = u.array_to_tensor(c.consts["NOISE_STD"] * np.random.standard_normal((
-                                                                       c.consts["IMAGE_DIM"], 
-                                                                       c.consts["IMAGE_DIM"], 3)))
+                                                                c.consts["IMAGE_DIM"], 
+                                                                c.consts["IMAGE_DIM"], 3)))
         if torch.cuda.is_available():
             self.noise = self.noise.to(torch.device("cuda"))
     def forward(self, patch):
@@ -30,7 +30,8 @@ class ImageProcessingModule(torch.nn.Module):
         super().__init__()
         self.jitter()
         if normalize :
-            self.normalize = Normalize(c.consts["MEAN"], c.consts["STD"])
+            self.normalize = Normalize(c.consts["NORMALIZATION_MEAN"], 
+                                       c.consts["NORMALIZATION_STD"])
         else :
             self.normalize = lambda x: x
         

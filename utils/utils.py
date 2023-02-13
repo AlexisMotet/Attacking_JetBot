@@ -65,7 +65,7 @@ def load_model():
 def setup_config(config):
     for key, value in config.items():
         if key not in c.consts :
-            raise Exception("This key is not supported")
+            raise Exception("The key %s is not supported" % key)
         elif type(value) != type(c.consts[key]):
             raise Exception("Expected type of the value for key %s is %s, got %s" % 
                             (key, type(c.consts[key]), type(value)))

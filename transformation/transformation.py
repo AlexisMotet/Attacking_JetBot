@@ -76,13 +76,13 @@ class TransformationTool():
                 nj = int(round(nj_float))
                 
                 if 0 <= ni < c.consts["IMAGE_DIM"] and 0 <= nj < c.consts["IMAGE_DIM"] :
-                    
                     d = math.sqrt((ni - ni_float)**2 + 
-                                    (nj - nj_float)**2)
-                    weight = (math.sqrt(0.5) - d)/math.sqrt(0.5) + 1/2
-                    map_[(j, i)] = (nj, ni)
+                                  (nj - nj_float)**2)
+                    weight = (2 * math.sqrt(0.5) - d)/(2 * math.sqrt(0.5))
+                    map_[(j, i)] = {"ncoords" : (nj, ni), "weight" : weight}
                     if (nj, ni) not in save:
-                        save[(nj, ni)] = {"values" : [], "weights" : []}
+                        save[(nj, ni)] = {"values" : [], 
+                                          "weights" : []}
                     save[(nj, ni)]["values"].append(weight * image[0, :, j, i])
                     save[(nj, ni)]["weights"].append(weight)
                     transformed[0, :, nj, ni] = sum(save[(nj, ni)]["values"])/ \
@@ -109,7 +109,9 @@ class TransformationTool():
         for i in range(self.min_row, self.max_row + 1):
             for j in range(self.min_col, self.max_col + 1):
                 if (j, i) in map_ :
-                    nj, ni = map_[(j, i)]
+                    nj, ni = map_[(j, i)]["ncoords"]
+                    w = map_[(j, i)]["weight"]
                     if 0 <= ni < c.consts["IMAGE_DIM"] and 0 <= nj <  c.consts["IMAGE_DIM"] :
-                        new_patch[0, :, j, i] = transformed[0, :, nj, ni]
+                        new_patch[0, :, j, i] = ((1 - w) * new_patch[0, :, j, i] + 
+                                                 transformed[0, :, nj, ni])/(2 - w)
         return new_patch
