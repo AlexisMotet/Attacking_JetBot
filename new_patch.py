@@ -147,7 +147,8 @@ class PatchTrainer():
                 with torch.no_grad():
                     transformed -= target_grad - transformed.grad
             transformed.grad.zero_()
-            transformed.clamp_(1e-5, 1)    
+            with torch.no_grad():
+                transformed.clamp_(1e-5, 1)    
         self.patch = self.transformation_tool.undo_transform(self.patch, 
                                                              transformed.detach(),
                                                              map_)
