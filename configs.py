@@ -20,27 +20,28 @@ config = {
                                         [-0.0034, 0.9849, 0.1729, 0],
                                         [0.0257, -0.1728, 0.9846, 0],
                                         [0, 0, 0, 1]])),
-    "ANGLES_RANGE" : math.radians(15),
+    "ANGLES_RANGE" : math.radians(10),
     "SCALE_FACTOR_MIN" : 0.8,
-    "NOISE_STD" : 3 * np.array([0.0107681, 0.00957908, 0.01005988]),
+    "NOISE_STD" : 3*np.array([0.0107681, 0.00957908, 0.01005988]),
     "BLUR_KERNEL_SIZE" : 5,
     "BLUR_SIGMA_MAX" : 0.5,
     "BRIGHTNESS_BIAS" : 0.2,
     "CONTRAST_GAIN" : 0.35,
     "RESIZE_DIM" : 256,
     "IMAGE_DIM" : 224,
-    "RATIO_TRAIN_TEST" : 2 / 3,
+    "RATIO_TRAIN_TEST" : 2/3,
     "NORMALIZATION_MEAN" : [0.485, 0.456, 0.406],
     "NORMALIZATION_STD" : [0.229, 0.224, 0.225],
-    "LIMIT_TRAIN_EPOCH_LEN" : 150,
-    "LIMIT_TEST_LEN" : 60,
+    "LIMIT_TRAIN_EPOCH_LEN" : -1,
+    "LIMIT_TEST_LEN" : -1,
     "N_ENREG_IMG" : 1,
 }
 
 config_colab = config.copy()
 
-config_colab["PATH_MODEL"] = "/content/PROJET_3A/best_model_extended.pth"
-config_colab["PATH_DATASET"] = "/content/PROJET_3A/dataset/"
+config_colab["PATH_MODEL"] = "/content/PROJET_3A/new_imagenette2-160_model.pth"
+config_colab["PATH_DATASET"] = "/content/PROJET_3A/imagenette2-160/train/"
+config_colab["N_CLASSES"] = 10
 config_colab["PATH_IMG_FOLDER"] = "/content/projet_3A/images/"
 config_colab["PATH_PRINTABLE_COLORS"] = "/content/projet_3A/printability/printable_colors.txt"
 

@@ -242,7 +242,7 @@ class PatchTrainer():
             if len(image) == 0:
                 continue   
                     
-            total += 1
+            total += len(image)
             
             self.image_processing_module.jitter()
             self.patch_processing_module.jitter()
