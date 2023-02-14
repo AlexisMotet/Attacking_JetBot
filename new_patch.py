@@ -90,10 +90,6 @@ class PatchTrainer():
         return self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
                                 self.c0:self.c0 + self.patch_dim]
     
-    def _prevent_zeros(self):
-        self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
-                         self.c0:self.c0 + self.patch_dim] += 1e-5
-        
     def _apply_specific_grads(self):
         patch_ = self._get_patch()
         patch_.requires_grad = True    
@@ -103,7 +99,7 @@ class PatchTrainer():
         patch_.grad.zero_()
         loss = self.tv_module(patch_)
         loss.backward()
-        tv_grad = patch_.grad
+        tv_grad = patch_.grad.clone()
         patch_.requires_grad = False
         patch_ -= self.lambda_tv * tv_grad + self.lambda_print * print_grad 
         self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
@@ -151,13 +147,11 @@ class PatchTrainer():
                 with torch.no_grad():
                     transformed -= target_grad - transformed.grad
             transformed.grad.zero_()
-                
+            transformed.clamp_(1e-5, 1)    
         self.patch = self.transformation_tool.undo_transform(self.patch, 
                                                              transformed.detach(),
                                                              map_)
         self._apply_specific_grads()
-        self.patch.clamp_(0, 1)
-        self._prevent_zeros()
         return first_target_proba, normalized
 
     def train(self):
