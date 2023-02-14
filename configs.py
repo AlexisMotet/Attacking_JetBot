@@ -32,9 +32,9 @@ config = {
     "RATIO_TRAIN_TEST" : 2 / 3,
     "NORMALIZATION_MEAN" : [0.485, 0.456, 0.406],
     "NORMALIZATION_STD" : [0.229, 0.224, 0.225],
-    "LIMIT_TRAIN_EPOCH_LEN" : -1,
-    "LIMIT_TEST_LEN" : -1,
-    "N_ENREG_IMG" : 10,
+    "LIMIT_TRAIN_EPOCH_LEN" : 150,
+    "LIMIT_TEST_LEN" : 60,
+    "N_ENREG_IMG" : 1,
 }
 
 config_colab = config.copy()

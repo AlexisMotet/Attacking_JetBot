@@ -116,10 +116,12 @@ class PatchTrainer():
             normalized = self.image_processing_module(attacked)
             vector_scores = self.model(normalized)
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
-            target_proba = float(vector_proba[0, self.target_class])
-            
-            if i == 0: first_target_proba = target_proba
-            else: self.pretty_printer.update_iteration(i, target_proba)
+            target_proba = torch.mean(vector_proba[:, self.target_class])
+
+            if i == 0: 
+                first_target_proba = target_proba
+            else: 
+                self.pretty_printer.update_iteration(i, target_proba)
 
             if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE]:
                 if target_proba >= self.threshold : break    
@@ -130,20 +132,20 @@ class PatchTrainer():
                 
             loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
             if self.mode == c.Mode.TARGET :
-                loss[0, self.target_class].backward()
+                torch.mean(loss[:, self.target_class]).backward()
                 with torch.no_grad():
                     transformed -= transformed.grad
             elif self.mode == c.Mode.FLEE:
-                loss[0, self.target_class].backward()
+                torch.mean(loss[:, self.target_class]).backward()
                 with torch.no_grad():
                     transformed += transformed.grad
             elif self.mode == c.Mode.TARGET_AND_FLEE:
-                loss[0, self.target_class].backward(retain_graph=True)
+                torch.mean(loss[:, self.target_class]).backward(retain_graph=True)
                 target_grad = transformed.grad.clone()
                 model_label = int(torch.argmax(vector_scores))
                 transformed.grad.zero_()
                 if model_label != self.target_class :
-                    loss[0, model_label].backward()
+                    torch.mean(loss[:, model_label]).backward()
                 with torch.no_grad():
                     transformed -= target_grad - transformed.grad
             transformed.grad.zero_()
@@ -164,16 +166,19 @@ class PatchTrainer():
                 if torch.cuda.is_available():
                     image = image.to(torch.device("cuda"))
                 vector_scores = self.model(self.image_processing_module(image))
-                model_label = int(torch.argmax(vector_scores))
-                if model_label != int(true_label) :
-                    continue
-                elif self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] and \
-                        model_label == self.target_class:
-                    continue
-                elif self.mode == c.Mode.FLEE and \
-                        model_label != self.target_class:
-                    continue
-
+                argmax = torch.argmax(vector_scores, axis=1)
+                if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
+                    logical = torch.logical_and(argmax == true_label, 
+                                                argmax != self.target_class)
+                    image = image[logical]
+                elif self.mode == c.Mode.FLEE :
+                    logical = torch.logical_and(argmax == true_label, 
+                                                argmax == self.target_class)
+                    image = image[logical]
+                
+                if len(image) == 0:
+                    continue    
+                    
                 if total == 0 :
                     success_rate = None
                 else :
@@ -197,12 +202,12 @@ class PatchTrainer():
                         success += 1
 
                 if total % c.consts["N_ENREG_IMG"] == 0:
-                    torchvision.utils.save_image(image, 
+                    torchvision.utils.save_image(image[0], 
                                                  c.consts["PATH_IMG_FOLDER"] + 
                                                  'epoch%d_image%d_label%d_original.png'
-                                                 % (epoch, total, int(true_label)))
+                                                 % (epoch, total, true_label[0]))
 
-                    torchvision.utils.save_image(attacked, 
+                    torchvision.utils.save_image(attacked[0], 
                                                  c.consts["PATH_IMG_FOLDER"] + 
                                                  'epoch%d_image%d_attacked.png'
                                                  % (epoch, total))
@@ -224,15 +229,19 @@ class PatchTrainer():
             if torch.cuda.is_available():
                     image = image.to(torch.device("cuda"))
             vector_scores = self.model(self.image_processing_module(image))
-            model_label = int(torch.argmax(vector_scores))
-            if model_label != int(true_label) :
-                continue
-            elif self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] \
-                    and model_label == self.target_class:
-                continue
-            elif self.mode == c.Mode.FLEE and model_label != self.target_class:
-                continue
+            argmax = torch.argmax(vector_scores, axis=1)
+            if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
+                logical = torch.logical_and(argmax == true_label, 
+                                            argmax != self.target_class)
+                image = image[logical]
+            elif self.mode == c.Mode.FLEE :
+                logical = torch.logical_and(argmax == true_label, 
+                                            argmax == self.target_class)
+                image = image[logical]   
             
+            if len(image) == 0:
+                continue   
+                    
             total += 1
             
             self.image_processing_module.jitter()
@@ -244,21 +253,20 @@ class PatchTrainer():
             attacked = torch.mul(1 - mask, image) + torch.mul(mask, modified)
             normalized = self.image_processing_module(attacked)
             vector_scores = self.model(normalized)
-            attacked_label = int(torch.argmax(vector_scores))
+            attacked_label = torch.argmax(vector_scores, axis=1)
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
-            target_proba = float(vector_proba[0, self.target_class])
-            
+            target_proba = torch.mean(vector_proba[:, self.target_class])
+
             if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
-                if attacked_label == self.target_class: 
-                    success += 1
+                print("int", attacked_label == self.target_class, int(torch.count_nonzero(attacked_label == self.target_class)))
+                success += int(torch.count_nonzero(attacked_label == self.target_class))
             elif self.mode == c.Mode.FLEE :
-                if attacked_label != self.target_class: 
-                    success += 1
+                success += int(torch.count_nonzero(attacked_label != self.target_class))
 
             if total % c.consts["N_ENREG_IMG"] == 0:
-                torchvision.utils.save_image(normalized, c.consts["PATH_IMG_FOLDER"] + 
+                torchvision.utils.save_image(normalized[0], c.consts["PATH_IMG_FOLDER"] + 
                                              'test_epoch%d_target_proba%.2f_label%d.png'
-                                             % (epoch, target_proba, attacked_label))
+                                             % (epoch, target_proba, attacked_label[0]))
             self.pretty_printer.update_test(epoch, 100 * success / float(total), 
                                             total)
             if c.consts["LIMIT_TEST_LEN"] != -1 and total >= c.consts["LIMIT_TEST_LEN"] :

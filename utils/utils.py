@@ -39,13 +39,13 @@ def load_dataset():
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=1,
+        batch_size=5,
         shuffle=True,
     )
 
     test_loader = torch.utils.data.DataLoader(
         test_dataset,
-        batch_size=1,
+        batch_size=5,
         shuffle=True,
     )
     return train_loader, test_loader
