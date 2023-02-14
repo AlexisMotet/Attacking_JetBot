@@ -165,6 +165,7 @@ class PatchTrainer():
             for image, true_label in self.train_loader:
                 if torch.cuda.is_available():
                     image = image.to(torch.device("cuda"))
+                    true_label = true_label.to(torch.device("cuda"))
                 vector_scores = self.model(self.image_processing_module(image))
                 argmax = torch.argmax(vector_scores, axis=1)
                 if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
@@ -228,6 +229,7 @@ class PatchTrainer():
         for image, true_label in self.test_loader:
             if torch.cuda.is_available():
                     image = image.to(torch.device("cuda"))
+                    true_label = true_label.to(torch.device("cuda"))
             vector_scores = self.model(self.image_processing_module(image))
             argmax = torch.argmax(vector_scores, axis=1)
             if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
@@ -258,7 +260,6 @@ class PatchTrainer():
             target_proba = torch.mean(vector_proba[:, self.target_class])
 
             if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
-                print("int", attacked_label == self.target_class, int(torch.count_nonzero(attacked_label == self.target_class)))
                 success += int(torch.count_nonzero(attacked_label == self.target_class))
             elif self.mode == c.Mode.FLEE :
                 success += int(torch.count_nonzero(attacked_label != self.target_class))
