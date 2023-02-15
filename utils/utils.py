@@ -89,10 +89,7 @@ class PrettyPrinter():
         self.attributes = (Attribute("date"),
                             Attribute("target_class"),
                             Attribute("patch_relative_size"),
-                            Attribute("n_epochs"),
-                            Attribute("mode"),
-                            Attribute("threshold"),
-                            Attribute("max_iterations"))
+                            Attribute("n_epochs"))
 
     def training(self):
         print("================ TRAINING ================")
@@ -105,22 +102,22 @@ class PrettyPrinter():
         if len(self.attributes) % 2 != 0 : print("%s=%s" % (name, val))
         print("==========================================")
         
-    def update_test(self, epoch, success_rate, total):
-        txt = "[TEST] Epoch %02d - SR %1.3f%% - Image %03d" % (epoch, success_rate, total)
+    def update_test(self, epoch, success_rate, total, size):
+        txt = "[TEST] Epoch %02d - SR %1.3f%% - Batch %03d - Size %02d" % (epoch, success_rate, total, size)
         if len(txt) != self.last_len : 
             self.clear()
         sys.stdout.write("\r" + txt)
         self.last_len = len(txt)
 
-    def update_image(self, epoch, success_rate, total):
+    def update_batch(self, epoch, success_rate, total, size):
         if success_rate is None : 
-            self.saved = "[TRAINING] Epoch %02d - SR %s - Image %03d" % (epoch, success_rate, total)
+            self.saved = "[TRAINING] Epoch %02d - SR %s - Batch %03d - Size %02d" % (epoch, success_rate, total, size)
         else :
-            self.saved = "[TRAINING] Epoch %02d - SR %3.3f%% - Image %03d" % (epoch, success_rate, total)
+            self.saved = "[TRAINING] Epoch %02d - SR %3.3f%% - Batch %03d - Size %02d" % (epoch, success_rate, total, size)
 
     def update_iteration(self, i, target_proba):
         assert self.saved
-        txt = "%s - [ATTACK] SGD iteration %03d - Target Probability %1.3f" % (self.saved, i, target_proba)
+        txt = "%s - [ATTACK] SGD iteration %03d - Avg Target Probability %1.3f" % (self.saved, i, target_proba)
         if len(txt) != self.last_len : 
             self.clear()
         sys.stdout.write("\r" + txt)

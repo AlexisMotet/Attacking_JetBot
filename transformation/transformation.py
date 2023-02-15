@@ -94,8 +94,9 @@ class TransformationTool():
         
         x_c, y_c = c.consts["IMAGE_DIM"]//2, c.consts["IMAGE_DIM"]//2
         
-        x_t, y_t = np.random.randint(-x_c + self.patch_dim//2, 
-                                      x_c - self.patch_dim//2, 2)
+        x_t = np.random.randint(-x_c + self.patch_dim, x_c - self.patch_dim)
+        y_t = np.random.randint(-y_c + self.patch_dim, 0)
+        
         point_t = (1/scale_factor) * np.array([x_c + x_t, y_c + y_t, 1])
         nx_t, ny_t = (self.matrix_2dto3d@point_t)[:2]
         angles = np.zeros(3)

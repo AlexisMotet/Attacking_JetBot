@@ -55,7 +55,6 @@ class PatchWidget(QWidget):
         button_consts.clicked.connect(self.see_constants)
         button_consts.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
         vbox.addWidget(button_consts)
-        
         for attr in attributes :
             name, val = attr.get_tuple(patch_trainer)
             h = QHBoxLayout()
@@ -68,20 +67,15 @@ class PatchWidget(QWidget):
             vbox.addLayout(h)
 
         vbox_plot = QVBoxLayout()
-        if not patch_trainer.validation :
-            vbox_plot.addWidget(QLabel("Success rate %.2f%%"
-                                       % patch_trainer.success_rate_test[-1]))
+
         for i, e in enumerate(patch_trainer.target_proba_train.keys()) :
             if patch_trainer.n_epochs > 5 :
                 if i%2 == 1 and i!=patch_trainer.n_epochs - 1:
                     continue
             color = random_color()
-            if patch_trainer.validation :
-                plot = self.create_plot_item("Train epoch %d - "
-                                             "Validation success rate : %.2f%%" % 
-                                             (e, patch_trainer.success_rate_test[e]))
-            else :
-                plot = self.create_plot_item("Train epoch %d" % e)
+            plot = self.create_plot_item("Train epoch %d - "
+                                            "Validation success rate : %.2f%%" % 
+                                            (e, patch_trainer.success_rate_test[e]))
             plot.plot(range(len(patch_trainer.target_proba_train[e])), 
                         patch_trainer.target_proba_train[e], 
                         pen=pg.mkPen(color = color, width = 2), 
@@ -124,16 +118,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         
         self.attributes = (u.Attribute("date"),
-                            u.Attribute("path_model"),
-                            u.Attribute("path_dataset"),
-                            u.Attribute("limit_train_epoch_len"),
-                            u.Attribute("limit_test_len"),
-                            u.Attribute("mode"),
                             u.Attribute("target_class"),
                             u.Attribute("patch_relative_size"),
-                            u.Attribute("n_epochs"),
-                            u.Attribute("threshold"),
-                            u.Attribute("max_iterations"))
+                            u.Attribute("n_epochs"))
         
         self.setWindowTitle("Patch Viewer")
         file_menu = self.menuBar().addMenu("File")

@@ -1,5 +1,6 @@
 import torch
 import torchvision
+from torchvision.transforms import Normalize
 import datetime
 import image_processing.image_processing as i
 import utils.utils as u
@@ -12,24 +13,16 @@ from configs import config
 
 
 class PatchTrainer():
-    def __init__(self, config=config, mode=c.Mode.TARGET, validation=True, 
-                 target_class=1, patch_relative_size=0.05, n_epochs=2, 
-                 lambda_tv=0, lambda_print=0,
-                 threshold=0.9, max_iterations=10):
+    def __init__(self, config=config, target_class=1, patch_relative_size=0.05, 
+                 n_epochs=2):
+        
         self.pretty_printer = u.PrettyPrinter(self)
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        if config :
-            u.setup_config(config)
+        u.setup_config(config)
         self.pretty_printer.print_config(config)
-        self.mode = mode
-        self.validation = validation
         self.target_class = target_class
         self.patch_relative_size = patch_relative_size
-        self.lambda_tv = lambda_tv
-        self.lambda_print = lambda_print
         self.n_epochs = n_epochs
-        self.threshold = threshold
-        self.max_iterations = max_iterations
 
         self.model = u.load_model()
         self.model.eval()
@@ -44,10 +37,11 @@ class PatchTrainer():
         self.r0, self.c0 = c.consts["IMAGE_DIM"]//2 - self.patch_dim//2, \
                            c.consts["IMAGE_DIM"]//2 - self.patch_dim//2
 
-        self.image_processing_module = i.ImageProcessingModule(normalize=True)
+        self.normalize = Normalize(c.consts["NORMALIZATION_MEAN"], 
+                                   c.consts["NORMALIZATION_STD"])
         self.patch_processing_module = i.PatchProcessingModule()
         
-        self.transformation_tool = t.TransformationTool(self.patch_dim)
+        self.transfo_tool = t.TransformationTool(self.patch_dim)
         
         self.print_module = pt.PrintabilityModule(self.patch_dim)
         self.tv_module = tv.TotalVariationModule()
@@ -69,21 +63,21 @@ class PatchTrainer():
     def test_model(self):
         success, total = 0, 0
         for loader in [self.train_loader, self.test_loader]:
-            for image, label in loader:
+            for batch, labels in loader:
                 if torch.cuda.is_available():
-                    image = image.to(torch.device("cuda"))
-                output = self.model(self.image_processing_module(image))
-                success += (label == output.argmax(1)).sum()
-                total += len(label)
+                    batch = batch.to(torch.device("cuda"))
+                output = self.model(self.normalize(batch))
+                success += (labels == output.argmax(1)).sum()
+                total += len(labels)
                 print('sucess/total : %d/%d accuracy : %.2f' 
                         % (success, total, (100 * success / float(total))))
         
     @staticmethod
-    def _get_mask(image):
-        mask = torch.zeros_like(image)
+    def _get_mask(patch):
+        mask = torch.zeros_like(patch)
         if torch.cuda.is_available():
             mask = mask.to(torch.device("cuda"))
-        mask[image != 0] = 1
+        mask[patch != 0] = 1
         return mask
     
     def _get_patch(self):
@@ -101,171 +95,137 @@ class PatchTrainer():
         loss.backward()
         tv_grad = patch_.grad.clone()
         patch_.requires_grad = False
-        patch_ -= self.lambda_tv * tv_grad + self.lambda_print * print_grad 
+        patch_ -= c.consts["LAMBDA_TV"] * tv_grad + c.consts["LAMBDA_PRINT"] * print_grad 
         self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
                          self.c0:self.c0 + self.patch_dim] = patch_
     
-    def attack(self, image):
-        transformed, map_ = self.transformation_tool.random_transform(self.patch)
+    def attack(self, batch):
+        transformed, map_ = self.transfo_tool.random_transform(self.patch)
         mask = self._get_mask(transformed)
         transformed.requires_grad = True
-        for i in range(self.max_iterations + 1) :
+        for i in range(c.consts["MAX_ITERATIONS"] + 1) :
             modified = self.patch_processing_module(transformed)
-            attacked = torch.mul(1 - mask, image) + \
+            attacked = torch.mul(1 - mask, batch) + \
                        torch.mul(mask, modified)
-            normalized = self.image_processing_module(attacked)
+            normalized = self.normalize(attacked)
             vector_scores = self.model(normalized)
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
-            target_proba = torch.mean(vector_proba[:, self.target_class])
+            target_proba = float(torch.mean(vector_proba[:, self.target_class]))
 
             if i == 0: 
                 first_target_proba = target_proba
+                successes = len(batch[first_target_proba >= c.consts["THRESHOLD"]])
             else: 
                 self.pretty_printer.update_iteration(i, target_proba)
 
-            if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE]:
-                if target_proba >= self.threshold : break    
-            elif self.mode == c.Mode.FLEE :
-                if target_proba <= self.threshold : break
-            else : 
-                assert False
+            if target_proba >= c.consts["THRESHOLD"] : 
+                break    
                 
             loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
-            if self.mode == c.Mode.TARGET :
-                torch.mean(loss[:, self.target_class]).backward()
-                with torch.no_grad():
-                    transformed -= transformed.grad
-            elif self.mode == c.Mode.FLEE:
-                torch.mean(loss[:, self.target_class]).backward()
-                with torch.no_grad():
-                    transformed += transformed.grad
-            else :
-              assert False
-            transformed.grad.zero_()
+            torch.mean(loss[:, self.target_class]).backward()
             with torch.no_grad():
-                transformed.clamp_(1e-5, 1)    
-        self.patch = self.transformation_tool.undo_transform(self.patch, 
-                                                             transformed.detach(),
-                                                             map_)
+                transformed -= transformed.grad
+                transformed.clamp_(1e-5, 1)
+            transformed.grad.zero_()
+        self.patch = self.transfo_tool.undo_transform(self.patch, transformed.detach(),
+                                                      map_)
         self._apply_specific_grads()
-        return first_target_proba, normalized
+        return first_target_proba, successes, normalized
 
     def train(self):
         self.pretty_printer.training()
         for epoch in range(self.n_epochs):
-            total, success = 0, 0
+            total, successes = 0, 0
             self.target_proba_train[epoch] = []
-            for image, true_label in self.train_loader:
+            for i, (batch, true_labels) in enumerate(self.train_loader):
                 if torch.cuda.is_available():
-                    image = image.to(torch.device("cuda"))
-                    true_label = true_label.to(torch.device("cuda"))
-                vector_scores = self.model(self.image_processing_module(image))
-                argmax = torch.argmax(vector_scores, axis=1)
-                if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
-                    logical = torch.logical_and(argmax == true_label, 
-                                                argmax != self.target_class)
-                    image = image[logical]
-                elif self.mode == c.Mode.FLEE :
-                    logical = torch.logical_and(argmax == true_label, 
-                                                argmax == self.target_class)
-                    image = image[logical]
+                    batch = batch.to(torch.device("cuda"))
+                    true_labels = true_labels.to(torch.device("cuda"))
+                vector_scores = self.model(self.normalize(batch))
+                model_labels = torch.argmax(vector_scores, axis=1)
+                logical = torch.logical_and(model_labels == true_labels, 
+                                            model_labels != self.target_class)
+                batch = batch[logical]
+                true_labels = true_labels[logical]
                 
-                if len(image) == 0:
+                if len(batch) == 0:
                     continue    
                     
                 if total == 0 :
                     success_rate = None
                 else :
-                    success_rate = 100 * (success / float(total))
+                    success_rate = 100 * (successes / float(total))
                     
-                self.pretty_printer.update_image(epoch, success_rate, total)
+                self.pretty_printer.update_batch(epoch, success_rate, i, len(batch))
         
-                total += 1
+                total += len(batch)
                 
-                self.image_processing_module.jitter()
                 self.patch_processing_module.jitter()
                 
-                first_target_proba, attacked = self.attack(image)
+                first_target_proba, s, attacked = self.attack(batch)
+                successes += s
                 self.target_proba_train[epoch].append(first_target_proba)
 
-                if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
-                    if first_target_proba >= self.threshold : 
-                        success += 1
-                elif self.mode == c.Mode.FLEE :
-                    if first_target_proba <= self.threshold : 
-                        success += 1
-
                 if total % c.consts["N_ENREG_IMG"] == 0:
-                    torchvision.utils.save_image(image[0], 
+                    torchvision.utils.save_image(batch[0], 
                                                  c.consts["PATH_IMG_FOLDER"] + 
-                                                 'epoch%d_image%d_label%d_original.png'
-                                                 % (epoch, total, true_label[0]))
+                                                 'epoch%d_batch%d_label%d_original.png'
+                                                 % (epoch, i, true_labels[0]))
 
                     torchvision.utils.save_image(attacked[0], 
                                                  c.consts["PATH_IMG_FOLDER"] + 
-                                                 'epoch%d_image%d_attacked.png'
-                                                 % (epoch, total))
+                                                 'epoch%d_batch%d_attacked.png'
+                                                 % (epoch, i))
 
                     torchvision.utils.save_image(self.patch, 
                                                  c.consts["PATH_IMG_FOLDER"] + 
-                                                 'epoch%d_image%d_patch.png'
-                                                 % (epoch, total))
-                    
+                                                 'epoch%d_batch%d_patch.png'
+                                                 % (epoch, i))
+
                 if c.consts["LIMIT_TRAIN_EPOCH_LEN"] != -1 and \
                         total >= c.consts["LIMIT_TRAIN_EPOCH_LEN"] :
                     break
-            if self.validation:
-                self.test(epoch)
+            self.test(epoch)
 
     def test(self, epoch=-1):
-        total, success = 0, 0
-        for image, true_label in self.test_loader:
+        total, successes = 0, 0
+        for i, (batch, true_labels) in enumerate(self.test_loader):
             if torch.cuda.is_available():
-                    image = image.to(torch.device("cuda"))
-                    true_label = true_label.to(torch.device("cuda"))
-            vector_scores = self.model(self.image_processing_module(image))
-            argmax = torch.argmax(vector_scores, axis=1)
-            if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
-                logical = torch.logical_and(argmax == true_label, 
-                                            argmax != self.target_class)
-                image = image[logical]
-            elif self.mode == c.Mode.FLEE :
-                logical = torch.logical_and(argmax == true_label, 
-                                            argmax == self.target_class)
-                image = image[logical]   
+                    batch = batch.to(torch.device("cuda"))
+                    true_labels = true_labels.to(torch.device("cuda"))
+            vector_scores = self.model(self.normalize(batch))
+            model_labels = torch.argmax(vector_scores, axis=1)
+            logical = torch.logical_and(model_labels == true_labels, 
+                                        model_labels != self.target_class)
+            batch = batch[logical]
             
-            if len(image) == 0:
+            if len(batch) == 0:
                 continue   
                     
-            total += len(image)
+            total += len(batch)
             
-            self.image_processing_module.jitter()
             self.patch_processing_module.jitter()
             
-            transformed, _ = self.transformation_tool.random_transform(self.patch)
+            transformed, _ = self.transfo_tool.random_transform(self.patch)
             mask = self._get_mask(transformed)
             modified = self.patch_processing_module(transformed)
-            attacked = torch.mul(1 - mask, image) + torch.mul(mask, modified)
-            normalized = self.image_processing_module(attacked)
+            attacked = torch.mul(1 - mask, batch) + torch.mul(mask, modified)
+            normalized = self.normalize(attacked)
             vector_scores = self.model(normalized)
             attacked_label = torch.argmax(vector_scores, axis=1)
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
-            target_proba = torch.mean(vector_proba[:, self.target_class])
+            target_proba = vector_proba[:, self.target_class]
 
-            if self.mode in [c.Mode.TARGET, c.Mode.TARGET_AND_FLEE] :
-                success += int(torch.count_nonzero(attacked_label == self.target_class))
-            elif self.mode == c.Mode.FLEE :
-                success += int(torch.count_nonzero(attacked_label != self.target_class))
+            successes += len(batch[attacked_label == self.target_class])
 
             if total % c.consts["N_ENREG_IMG"] == 0:
                 torchvision.utils.save_image(normalized[0], c.consts["PATH_IMG_FOLDER"] + 
                                              'test_epoch%d_target_proba%.2f_label%d.png'
-                                             % (epoch, target_proba, attacked_label[0]))
-            self.pretty_printer.update_test(epoch, 100 * success / float(total), 
-                                            total)
+                                             % (epoch, target_proba[0], attacked_label[0]))
+            self.pretty_printer.update_test(epoch, 100*successes/float(total), i, len(batch))
             if c.consts["LIMIT_TEST_LEN"] != -1 and total >= c.consts["LIMIT_TEST_LEN"] :
                 break
-        self.success_rate_test[epoch] = 100 * (success / float(total))
+        self.success_rate_test[epoch] = 100 * (successes / float(total))
 
     def save_patch(self, path):
         self.consts = c.consts
