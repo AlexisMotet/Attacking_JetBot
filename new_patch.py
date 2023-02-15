@@ -139,15 +139,8 @@ class PatchTrainer():
                 torch.mean(loss[:, self.target_class]).backward()
                 with torch.no_grad():
                     transformed += transformed.grad
-            elif self.mode == c.Mode.TARGET_AND_FLEE:
-                torch.mean(loss[:, self.target_class]).backward(retain_graph=True)
-                target_grad = transformed.grad.clone()
-                model_label = int(torch.argmax(vector_scores))
-                transformed.grad.zero_()
-                if model_label != self.target_class :
-                    torch.mean(loss[:, model_label]).backward()
-                with torch.no_grad():
-                    transformed -= target_grad - transformed.grad
+            else :
+              assert False
             transformed.grad.zero_()
             with torch.no_grad():
                 transformed.clamp_(1e-5, 1)    
