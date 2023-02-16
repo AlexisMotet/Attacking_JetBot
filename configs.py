@@ -9,7 +9,7 @@ config = {
     "N_CLASSES" : 2,
     "PATH_DATASET" : path + 'Projet_Adversarial_Patch/Project_Adverserial_Patch/Collision_Avoidance/dataset/',
     "PATH_IMG_FOLDER" : path +  "projet_MOTET/images/",
-    "PATH_PRINTABLE_COLORS" : path + "projet_MOTET/printability/printable_colors.txt",
+    "PATH_PRINTABLE_COLORS" : "printability/pantone-colors.json",
     "LAMBDA_TV" : 0.,
     "LAMBDA_PRINT" : 0.,
     "THRESHOLD" : 0.9,
@@ -39,6 +39,7 @@ config = {
     "LIMIT_TRAIN_EPOCH_LEN" : 150,
     "LIMIT_TEST_LEN" : 70,
     "N_ENREG_IMG" : 1,
+    "N_COLORS" : 100,
 }
 """
 config["PATH_MODEL"] = "C:\\Users\\alexi\\PROJET_3A\\projet_MOTET\\new_imagenette2-160_model.pth"
