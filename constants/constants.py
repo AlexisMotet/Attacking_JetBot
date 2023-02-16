@@ -1,4 +1,3 @@
-from enum import Enum
 import numpy as np
 
 consts = {
@@ -20,6 +19,10 @@ consts = {
     "EXTRINSIC_R" : np.array([]),
     "ANGLES_RANGE" : float(),
     "SCALE_FACTOR_MIN" : float(),
+    "X_TOP_LEFT" : int(),
+    "Y_TOP_LEFT" : int(),
+    "X_BOTTOM_RIGHT" : int(),
+    "Y_BOTTOM_RIGHT" : int(),
     "NOISE_STD" : np.array([]),
     "BLUR_KERNEL_SIZE" : int(),
     "BLUR_SIGMA_MAX" : float(),
@@ -33,10 +36,6 @@ consts = {
     "LIMIT_TRAIN_EPOCH_LEN" : int(),
     "LIMIT_TEST_LEN" : int(),
     "N_ENREG_IMG" : int(),
+    "N_COLORS" : int(),
 }
-
-class Mode(Enum):
-    TARGET = 1
-    TARGET_AND_FLEE = 2
-    FLEE = 3
 
