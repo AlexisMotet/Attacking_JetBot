@@ -9,8 +9,6 @@ import pickle
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
 import torchvision
-from printability.new_printability import PrintabilityModule
-from total_variation.new_total_variation import TotalVariationModule
 
 QApplication.setAttribute(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 

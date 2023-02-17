@@ -2,7 +2,8 @@ import math
 import numpy as np
 import constants.constants as c
 import torch
-
+from torchvision.transforms.functional import rgb_to_grayscale
+import sklearn.cluster
 
 class TransformationTool():
     def __init__(self, patch_dim):
@@ -20,6 +21,7 @@ class TransformationTool():
         self.matrix_3dto2d = np.array([[c.consts["FX"], 0, c.consts["CX"], 0],
                                        [0, c.consts["FY"], c.consts["CY"], 0],
                                        [0, 0, 1, 0]])
+        self.kMeans = sklearn.cluster.KMeans(n_clusters=3)
         
     def _get_matrix_transformation(self, x_t, y_t, scale_factor,
                                   alpha, beta, gamma):
@@ -47,8 +49,8 @@ class TransformationTool():
         matrix_transformation = matrix_translation @ r
         return matrix_transformation
 
-    def _transform(self, image, mtx_transfo):
-        transformed = torch.zeros_like(image)
+    def _transform(self, patch, mtx_transfo):
+        transformed = torch.zeros_like(patch)
         if torch.cuda.is_available():
             transformed = transformed.to(torch.device("cuda"))
         map_ = {}
@@ -83,27 +85,42 @@ class TransformationTool():
                     if (nj, ni) not in save:
                         save[(nj, ni)] = {"values" : [], 
                                           "weights" : []}
-                    save[(nj, ni)]["values"].append(weight * image[0, :, j, i])
+                    save[(nj, ni)]["values"].append(weight * patch[0, :, j, i])
                     save[(nj, ni)]["weights"].append(weight)
                     transformed[0, :, nj, ni] = sum(save[(nj, ni)]["values"])/ \
                                                 sum(save[(nj, ni)]["weights"])
         return transformed, map_
     
-    def random_transform(self, image):
+    def random_transform(self, patch, grad=None):
         scale_factor = np.random.uniform(c.consts["SCALE_FACTOR_MIN"], 1)
+
+        if grad is None :
+            x_t = np.random.randint(c.consts["X_TOP_LEFT"], c.consts["X_BOTTOM_RIGHT"])
+            y_t = np.random.randint(c.consts["Y_TOP_LEFT"], c.consts["Y_BOTTOM_RIGHT"])
+        else :
+            x_t, y_t = self._translation(grad)
         
-        x_c, y_c = c.consts["IMAGE_DIM"]//2, c.consts["IMAGE_DIM"]//2
-        
-        x_t = np.random.randint(c.consts["X_TOP_LEFT"] - x_c, c.consts["X_BOTTOM_RIGHT"] - x_c)
-        y_t = np.random.randint(c.consts["Y_TOP_LEFT"] - x_c, c.consts["Y_BOTTOM_RIGHT"] - x_c)
-        
-        point_t = (1/scale_factor) * np.array([x_c + x_t, y_c + y_t, 1])
+        point_t = (1/scale_factor) * np.array([x_t, y_t, 1])
         nx_t, ny_t = (self.matrix_2dto3d@point_t)[:2]
         angles = np.zeros(3)
         angles[np.random.randint(2)] = np.random.uniform(-c.consts["ANGLES_RANGE"], 
                                                           c.consts["ANGLES_RANGE"])
         mtx_transfo = self._get_matrix_transformation(nx_t, ny_t, scale_factor, *angles)
-        return self._transform(image, mtx_transfo)
+        return self._transform(patch, mtx_transfo)
+    
+    def _translation(self, grad):
+        x0, y0 = c.consts["X_TOP_LEFT"], c.consts["Y_TOP_LEFT"]
+        x1, y1 = c.consts["X_BOTTOM_RIGHT"], c.consts["Y_BOTTOM_RIGHT"]
+        mask = torch.zeros(c.consts["IMAGE_DIM"], c.consts["IMAGE_DIM"])
+        mask[y0:y1, x0:x1] = torch.ones(y1-y0, x1-x0)
+        gray_grad = torch.mul(rgb_to_grayscale(grad)[0, 0], mask)
+        self.gray_grad = gray_grad/torch.max(gray_grad)
+        self.binary = np.where(self.gray_grad < 0.3, 0, 1)
+        X = np.transpose(self.binary.nonzero())
+        self.kMeans.fit(X)
+        y_t, x_t = self.kMeans.cluster_centers_[np.random.randint(
+            len(self.kMeans.cluster_centers_))]
+        return x_t, y_t
             
     def undo_transform(self, patch, transformed, map_):
         new_patch = patch.clone()

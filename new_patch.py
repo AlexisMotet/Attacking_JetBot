@@ -12,12 +12,14 @@ import pickle
 from configs import config
 from PIL import Image
 import numpy as np
+import matplotlib.pyplot as plt
 
 class PatchTrainer():
     def __init__(self, config=config, 
                  path_image_init=None, 
                  target_class=1, 
-                 flee_class=0, 
+                 flee_class=0,
+                 random_translation=False,
                  patch_relative_size=0.05, 
                  n_epochs=2):
         
@@ -28,6 +30,7 @@ class PatchTrainer():
         self.path_image_init = path_image_init
         self.target_class = target_class
         self.flee_class = flee_class
+        self.random_translation = random_translation
         self.patch_relative_size = patch_relative_size
         self.n_epochs = n_epochs
 
@@ -115,8 +118,8 @@ class PatchTrainer():
         self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
                          self.c0:self.c0 + self.patch_dim] = patch_
     
-    def attack(self, batch):
-        transformed, map_ = self.transfo_tool.random_transform(self.patch)
+    def attack(self, batch, grad=None):
+        transformed, map_ = self.transfo_tool.random_transform(self.patch, grad)
         mask = self._get_mask(transformed)
         transformed.requires_grad = True
         for i in range(c.consts["MAX_ITERATIONS"] + 1) :
@@ -137,7 +140,7 @@ class PatchTrainer():
             if target_proba >= c.consts["THRESHOLD"] : 
                 break
                 
-            if self.target_class is not None and self.flee_class is not None :
+            if self.flee_class is not None :
                 loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
                 torch.mean(loss[:, self.target_class]).backward(retain_graph=True)
                 target_grad = transformed.grad.clone()
@@ -146,15 +149,9 @@ class PatchTrainer():
                 with torch.no_grad():
                     transformed -= target_grad - transformed.grad
                     transformed.clamp_(0, 1)
-            elif self.target_class is not None :
-                loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
-                torch.mean(loss[:, self.target_class]).backward()
-                with torch.no_grad():
-                    transformed -= transformed.grad
-                    transformed.clamp_(0, 1)
             else :
                 loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
-                torch.mean(loss[:, self.flee_class]).backward()
+                torch.mean(loss[:, self.target_class]).backward()
                 with torch.no_grad():
                     transformed -= transformed.grad
                     transformed.clamp_(0, 1)
@@ -176,8 +173,18 @@ class PatchTrainer():
                 if torch.cuda.is_available():
                     batch = batch.to(torch.device("cuda"))
                     true_labels = true_labels.to(torch.device("cuda"))
-                vector_scores = self.model(self.normalize(batch))
+                if self.random_translation :
+                    vector_scores = self.model(self.normalize(batch))
+                else :
+                    batch.requires_grad = True
+                    vector_scores = self.model(self.normalize(batch))
+                    loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
+                    torch.mean(loss[:, self.target_class]).backward()
+                    grad = torch.mean(batch.grad, axis=0, keepdim=True)
+                    batch.requires_grad = False
+                    
                 model_labels = torch.argmax(vector_scores, axis=1)
+                
                 logical = torch.logical_and(model_labels == true_labels, 
                                             model_labels != self.target_class)
                 batch = batch[logical]
@@ -196,8 +203,10 @@ class PatchTrainer():
                 total += len(batch)
                 
                 self.patch_processing_module.jitter()
-                
-                first_target_proba, s, attacked = self.attack(batch)
+                if self.random_translation :
+                    first_target_proba, s, attacked = self.attack(batch)
+                else :
+                    first_target_proba, s, attacked = self.attack(batch, grad)
                 successes += s
                 self.target_proba_train[epoch].append(first_target_proba)
 
@@ -216,6 +225,28 @@ class PatchTrainer():
                                                  c.consts["PATH_IMG_FOLDER"] + 
                                                  'epoch%d_batch%d_patch.png'
                                                  % (epoch, i))
+                    
+                    if not self.random_translation : 
+                        plt.imshow(self.transfo_tool.binary)
+                        plt.savefig(c.consts["PATH_IMG_FOLDER"] + 
+                                    'epoch%d_batch%d_binary.png'
+                                    % (epoch, i),
+                                    bbox_inches='tight')
+                        plt.imshow(u.tensor_to_array(self.transfo_tool.gray_grad))
+                        plt.savefig(c.consts["PATH_IMG_FOLDER"] + 
+                                    'epoch%d_batch%d_gray_grad.png'
+                                    % (epoch, i),
+                                    bbox_inches='tight')
+                        
+                        plt.imshow(u.tensor_to_array(batch[0]))
+                        r = plt.scatter(self.transfo_tool.kMeans.cluster_centers_[:, 1],
+                                        self.transfo_tool.kMeans.cluster_centers_[:, 0],
+                                        s=100, c="orange")
+                        plt.savefig(c.consts["PATH_IMG_FOLDER"] + 
+                                    'epoch%d_batch%d_clusters.png'
+                                    % (epoch, i),
+                                    bbox_inches='tight')
+                        r.remove()
                 i += 1
                 if c.consts["LIMIT_TRAIN_EPOCH_LEN"] != -1 and \
                         i >= c.consts["LIMIT_TRAIN_EPOCH_LEN"] :
@@ -256,8 +287,8 @@ class PatchTrainer():
 
             if i % c.consts["N_ENREG_IMG"] == 0:
                 torchvision.utils.save_image(normalized[0], c.consts["PATH_IMG_FOLDER"] + 
-                                             'test_epoch%d_target_proba%.2f_label%d.png'
-                                             % (epoch, target_proba[0], attacked_label[0]))
+                                             'test_epoch%d_batch_%dtarget_proba%.2f_label%d.png'
+                                             % (epoch, i, target_proba[0], attacked_label[0]))
             self.pretty_printer.update_test(epoch, 100*successes/float(total), i, len(batch))
             i += 1
             if c.consts["LIMIT_TEST_LEN"] != -1 and i >= c.consts["LIMIT_TEST_LEN"] :

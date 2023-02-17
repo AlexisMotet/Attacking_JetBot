@@ -5,6 +5,8 @@ import time
 import torch
 import matplotlib.pyplot as plt
 import utils.utils as u
+import sklearn.cluster
+
 
 def tensor_to_array(tensor):
     max = torch.max(tensor)
@@ -155,5 +157,30 @@ class Trainer(unittest.TestCase):
             ax2.imshow(tensor_to_array(x))
             plt.pause(1)
         plt.show()
+    
+    def test_(self):
+        _, (ax1, ax2) = plt.subplots(1, 2)
+        import numpy as np
+        self.kMeans = sklearn.cluster.KMeans(n_clusters=10)
+        weights = torch.ones(1, 3, 40, 40)
+        for batch, true_labels in self.trainer.train_loader:
+            batch.requires_grad = True
+            vector_scores = self.trainer.model(self.trainer.normalize(batch))
+            loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
+            torch.mean(loss[:, self.trainer.target_class]).backward()
+            grad = torch.mean(batch.grad, axis=0, keepdim=True)
+            conv = torch.nn.functional.conv2d(input=torch.abs(grad), weight=weights)
+            conv = torch.squeeze(conv)
+            conv = conv/torch.max(conv)
+            binary = np.where(conv<0.5, 0, 1)
+            X = np.transpose(binary.nonzero())
+            self.kMeans.fit(X)
+            row, col = self.kMeans.cluster_centers_[np.random.randint(
+                len(self.kMeans.cluster_centers_))]
+            row0 = int(max(row - self.trainer.patch_dim / 2, 0))
+            col0 = int(max(col - self.trainer.patch_dim / 2, 0))
+            ax1.imshow(tensor_to_array(batch[0]))
+            ax2.imshow(binary)
+            plt.pause(1)
 if __name__ == '__main__':
     unittest.main()
