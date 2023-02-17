@@ -27,15 +27,26 @@ class PatchProcessingModule(torch.nn.Module):
         
         self.order = random.getrandbits(1)
         
-    def forward(self, patch):
+    def brightness_contrast(self, patch):
         if self.order : 
             brightness = patch + self.brightness
             modified = brightness * self.contrast
         else :
             contrast = patch * self.contrast
             modified = contrast + self.brightness
-            
-        blurred = gaussian_blur(modified, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
-                                        sigma=self.sigma_blur)
-        noisy = blurred + self.noise
+        return modified
+
+    def blurring(self, patch):
+        blurred = gaussian_blur(patch, kernel_size=c.consts["BLUR_KERNEL_SIZE"], 
+                                sigma=self.sigma_blur)
+        return blurred
+    
+    def noising(self, patch):
+        noisy = patch + self.noise
+        return noisy
+        
+    def forward(self, patch):
+        modified = self.brightness_contrast(patch)
+        blurred = self.blurring(modified)
+        noisy = self.noising(blurred)
         return noisy

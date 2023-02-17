@@ -10,17 +10,24 @@ import printability.new_printability as pt
 import total_variation.new_total_variation as tv
 import pickle
 from configs import config
-
+from PIL import Image
+import numpy as np
 
 class PatchTrainer():
-    def __init__(self, config=config, target_class=1, patch_relative_size=0.05, 
+    def __init__(self, config=config, 
+                 path_image_init=None, 
+                 target_class=1, 
+                 flee_class=0, 
+                 patch_relative_size=0.05, 
                  n_epochs=2):
         
         self.pretty_printer = u.PrettyPrinter(self)
         self.date = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         u.setup_config(config)
         self.pretty_printer.print_config(config)
+        self.path_image_init = path_image_init
         self.target_class = target_class
+        self.flee_class = flee_class
         self.patch_relative_size = patch_relative_size
         self.n_epochs = n_epochs
 
@@ -39,11 +46,13 @@ class PatchTrainer():
 
         self.normalize = Normalize(c.consts["NORMALIZATION_MEAN"], 
                                    c.consts["NORMALIZATION_STD"])
+        
         self.patch_processing_module = i.PatchProcessingModule()
         
         self.transfo_tool = t.TransformationTool(self.patch_dim)
         
         self.print_module = pt.PrintabilityModule(self.patch_dim)
+        
         self.tv_module = tv.TotalVariationModule()
         
         self.patch = self._random_patch_init()
@@ -55,9 +64,15 @@ class PatchTrainer():
         patch = torch.zeros(1, 3, c.consts["IMAGE_DIM"], c.consts["IMAGE_DIM"])
         if torch.cuda.is_available():
             patch = patch.to(torch.device("cuda"))
-        rand = torch.rand(3, self.patch_dim, self.patch_dim) + 1e-5
-        patch[:, :, self.r0:self.r0 + self.patch_dim, 
-                    self.c0:self.c0 + self.patch_dim] = rand
+        if self.path_image_init is not None :
+            image_init = u.array_to_tensor(np.asarray(Image.open(self.path_image_init))/255)
+            resize = torchvision.transforms.Resize((self.patch_dim, self.patch_dim))
+            patch[:, :, self.r0:self.r0 + self.patch_dim, 
+                        self.c0:self.c0 + self.patch_dim] = resize(image_init)
+        else :
+            rand = torch.rand(3, self.patch_dim, self.patch_dim) + 1e-5
+            patch[:, :, self.r0:self.r0 + self.patch_dim, 
+                        self.c0:self.c0 + self.patch_dim] = rand
         return patch
     
     def test_model(self):
@@ -121,15 +136,33 @@ class PatchTrainer():
             if target_proba >= c.consts["THRESHOLD"] : 
                 break    
                 
-            loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
-            torch.mean(loss[:, self.target_class]).backward()
-            with torch.no_grad():
-                transformed -= transformed.grad
-                transformed.clamp_(1e-5, 1)
-            transformed.grad.zero_()
+            if self.target_class is not None and self.flee_class is not None :
+                loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
+                torch.mean(loss[:, self.target_class]).backward(retain_graph=True)
+                target_grad = transformed.grad.clone()
+                transformed.grad.zero_()
+                torch.mean(loss[:, self.flee_class]).backward()
+                with torch.no_grad():
+                    transformed -= target_grad - transformed.grad
+                    transformed.clamp_(0, 1)
+            elif self.target_class is not None :
+                loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
+                torch.mean(loss[:, self.target_class]).backward()
+                with torch.no_grad():
+                    transformed -= transformed.grad
+                    transformed.clamp_(0, 1)
+            else :
+                loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
+                torch.mean(loss[:, self.flee_class]).backward()
+                with torch.no_grad():
+                    transformed -= transformed.grad
+                    transformed.clamp_(0, 1)
+            transformed.grad.zero_()  
+
         self.patch = self.transfo_tool.undo_transform(self.patch, transformed.detach(),
                                                       map_)
         self._apply_specific_grads()
+        self.patch.clamp_(0, 1)
         return first_target_proba, successes, normalized
 
     def train(self):
@@ -166,7 +199,7 @@ class PatchTrainer():
                 successes += s
                 self.target_proba_train[epoch].append(first_target_proba)
 
-                if total % c.consts["N_ENREG_IMG"] == 0:
+                if i % c.consts["N_ENREG_IMG"] == 0:
                     torchvision.utils.save_image(batch[0], 
                                                  c.consts["PATH_IMG_FOLDER"] + 
                                                  'epoch%d_batch%d_label%d_original.png'
@@ -183,7 +216,7 @@ class PatchTrainer():
                                                  % (epoch, i))
 
                 if c.consts["LIMIT_TRAIN_EPOCH_LEN"] != -1 and \
-                        total >= c.consts["LIMIT_TRAIN_EPOCH_LEN"] :
+                        i >= c.consts["LIMIT_TRAIN_EPOCH_LEN"] :
                     break
             self.test(epoch)
 
@@ -218,12 +251,12 @@ class PatchTrainer():
 
             successes += len(batch[attacked_label == self.target_class])
 
-            if total % c.consts["N_ENREG_IMG"] == 0:
+            if i % c.consts["N_ENREG_IMG"] == 0:
                 torchvision.utils.save_image(normalized[0], c.consts["PATH_IMG_FOLDER"] + 
                                              'test_epoch%d_target_proba%.2f_label%d.png'
                                              % (epoch, target_proba[0], attacked_label[0]))
             self.pretty_printer.update_test(epoch, 100*successes/float(total), i, len(batch))
-            if c.consts["LIMIT_TEST_LEN"] != -1 and total >= c.consts["LIMIT_TEST_LEN"] :
+            if c.consts["LIMIT_TEST_LEN"] != -1 and i >= c.consts["LIMIT_TEST_LEN"] :
                 break
         self.success_rate_test[epoch] = 100 * (successes / float(total))
 

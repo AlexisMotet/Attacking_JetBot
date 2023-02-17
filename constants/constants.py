@@ -6,6 +6,8 @@ consts = {
     "PATH_DATASET" : "",
     "PATH_PRINTABLE_COLORS" : "",
     "PATH_IMG_FOLDER" : "",
+    "BATCH_SIZE_TRAIN" : int(),
+    "BATCH_SIZE_TEST" : int(),
     "LAMBDA_TV" : float(),
     "LAMBDA_PRINT" :float(),
     "THRESHOLD" : float(),
