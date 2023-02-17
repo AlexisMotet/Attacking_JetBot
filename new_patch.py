@@ -59,6 +59,7 @@ class PatchTrainer():
 
         self.target_proba_train = {}
         self.success_rate_test = {}
+        self.patches = {}
 
     def _random_patch_init(self):
         patch = torch.zeros(1, 3, c.consts["IMAGE_DIM"], c.consts["IMAGE_DIM"])
@@ -221,7 +222,7 @@ class PatchTrainer():
                     break
             self.test(epoch)
 
-    def test(self, epoch=-1):
+    def test(self, epoch):
         total, successes = 0, 0
         i = 0
         for batch, true_labels in self.test_loader:
@@ -261,15 +262,25 @@ class PatchTrainer():
             i += 1
             if c.consts["LIMIT_TEST_LEN"] != -1 and i >= c.consts["LIMIT_TEST_LEN"] :
                 break
-        self.success_rate_test[epoch] = 100 * (successes / float(total))
+        sucess_rate = 100 * (successes / float(total))
+        self.success_rate_test[epoch] = sucess_rate
+        self.patches[epoch] = (self._get_patch(), sucess_rate)
 
     def save_patch(self, path):
         self.consts = c.consts
         self.model = None
         self.train_loader = None
         self.test_loader = None
-        self.patch = self._get_patch()
-        self.print_loss = float(self.print_module(self.patch))
-        self.tv_loss = float(self.tv_module(self.patch))
+        best_patch, best_success_rate = None, 0
+        for patch, success_rate in self.patches.values() :
+            if success_rate >= best_success_rate :
+                best_patch = patch
+                best_success_rate = success_rate
+        self.patches = None
+        self.print_loss = float(self.print_module(best_patch))
+        self.tv_loss = float(self.tv_module(best_patch))
+        self.best_patch = best_patch
+        self.max = float(torch.max(best_patch))
+        self.min = float(torch.min(best_patch))
         pickle.dump(self, open(path, "wb"))
         

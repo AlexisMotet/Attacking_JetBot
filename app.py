@@ -40,7 +40,7 @@ class PatchWidget(QWidget):
         canvas = FigureCanvas(figure)
         ax = figure.subplots()
         ax.set_axis_off()
-        ax.imshow(np.clip(u.tensor_to_array(patch_trainer.patch), 0, 1))
+        ax.imshow(np.clip(u.tensor_to_array(patch_trainer.best_patch), 0, 1))
         window.tab_widget.currentChanged.connect(lambda : canvas.setFixedSize(
             self.frameGeometry().width()//8, self.frameGeometry().width()//8))
         window.resized.connect(lambda : canvas.setFixedSize(
@@ -70,10 +70,10 @@ class PatchWidget(QWidget):
             vbox.addLayout(h)
 
         vbox_plot = QVBoxLayout()
-
+        
         for i, e in enumerate(patch_trainer.target_proba_train.keys()) :
             if patch_trainer.n_epochs > 5 :
-                if i%2 == 1 and i!=patch_trainer.n_epochs - 1:
+                if i%2 == 1 and i != patch_trainer.n_epochs-1:
                     continue
             color = random_color()
             plot = self.create_plot_item("Train epoch %d - "
@@ -102,7 +102,7 @@ class PatchWidget(QWidget):
 
     def save_patch_as_image(self):
         filename = QFileDialog.getSaveFileName(filter="*.png")
-        torchvision.utils.save_image(self.patch_trainer.patch, filename[0])
+        torchvision.utils.save_image(self.patch_trainer.best_patch, filename[0])
         
     def see_constants(self):
         message_box = QMessageBox(self)
@@ -126,7 +126,9 @@ class MainWindow(QMainWindow):
                             u.Attribute("patch_relative_size"),
                             u.Attribute("n_epochs"),
                             u.Attribute("print_loss"),
-                            u.Attribute("tv_loss"))
+                            u.Attribute("tv_loss"),
+                            u.Attribute("max"),
+                            u.Attribute("min"))
         
         self.setWindowTitle("Patch Viewer")
         file_menu = self.menuBar().addMenu("File")
