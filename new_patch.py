@@ -129,12 +129,12 @@ class PatchTrainer():
 
             if i == 0: 
                 first_target_proba = target_proba
-                successes = len(batch[first_target_proba >= c.consts["THRESHOLD"]])
+                successes = len(batch[vector_proba[:, self.target_class] >= c.consts["THRESHOLD"]])
             else: 
                 self.pretty_printer.update_iteration(i, target_proba)
 
             if target_proba >= c.consts["THRESHOLD"] : 
-                break    
+                break
                 
             if self.target_class is not None and self.flee_class is not None :
                 loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
@@ -158,7 +158,7 @@ class PatchTrainer():
                     transformed -= transformed.grad
                     transformed.clamp_(0, 1)
             transformed.grad.zero_()  
-
+        
         self.patch = self.transfo_tool.undo_transform(self.patch, transformed.detach(),
                                                       map_)
         self._apply_specific_grads()
@@ -170,7 +170,8 @@ class PatchTrainer():
         for epoch in range(self.n_epochs):
             total, successes = 0, 0
             self.target_proba_train[epoch] = []
-            for i, (batch, true_labels) in enumerate(self.train_loader):
+            i = 0
+            for batch, true_labels in self.train_loader:
                 if torch.cuda.is_available():
                     batch = batch.to(torch.device("cuda"))
                     true_labels = true_labels.to(torch.device("cuda"))
@@ -214,7 +215,7 @@ class PatchTrainer():
                                                  c.consts["PATH_IMG_FOLDER"] + 
                                                  'epoch%d_batch%d_patch.png'
                                                  % (epoch, i))
-
+                i += 1
                 if c.consts["LIMIT_TRAIN_EPOCH_LEN"] != -1 and \
                         i >= c.consts["LIMIT_TRAIN_EPOCH_LEN"] :
                     break
@@ -222,7 +223,8 @@ class PatchTrainer():
 
     def test(self, epoch=-1):
         total, successes = 0, 0
-        for i, (batch, true_labels) in enumerate(self.test_loader):
+        i = 0
+        for batch, true_labels in self.test_loader:
             if torch.cuda.is_available():
                     batch = batch.to(torch.device("cuda"))
                     true_labels = true_labels.to(torch.device("cuda"))
@@ -256,6 +258,7 @@ class PatchTrainer():
                                              'test_epoch%d_target_proba%.2f_label%d.png'
                                              % (epoch, target_proba[0], attacked_label[0]))
             self.pretty_printer.update_test(epoch, 100*successes/float(total), i, len(batch))
+            i += 1
             if c.consts["LIMIT_TEST_LEN"] != -1 and i >= c.consts["LIMIT_TEST_LEN"] :
                 break
         self.success_rate_test[epoch] = 100 * (successes / float(total))

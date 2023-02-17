@@ -120,16 +120,7 @@ class Trainer(unittest.TestCase):
             dist = (self.trainer.patch - new_img).pow(2).sum().sqrt()
             ax3.set_title("euclidian dist : %f" % dist)
             plt.pause(1)
-        plt.show()
-        
-    def test_transformation_3d(self):
-        ax = plt.figure().add_subplot(projection='3d')
-
-        
-        
-        
-        
-        
+        plt.show()        
         
     def test_total_variation(self):
         _, (ax1, ax2) = plt.subplots(1, 2)

@@ -12,8 +12,8 @@ config = {
     "PATH_PRINTABLE_COLORS" : "printability/pantone-colors.json",
     "BATCH_SIZE_TRAIN" : 20,
     "BATCH_SIZE_TEST" : 1,
-    "LAMBDA_TV" : 0.01,
-    "LAMBDA_PRINT" : 0.01,
+    "LAMBDA_TV" : 0.,
+    "LAMBDA_PRINT" : 0.,
     "THRESHOLD" : 0.9,
     "MAX_ITERATIONS" : 10,
     "FX" : 107.75,
@@ -45,7 +45,7 @@ config = {
     "LIMIT_TRAIN_EPOCH_LEN" : -1,
     "LIMIT_TEST_LEN" : -1,
     "N_ENREG_IMG" : 1,
-    "N_COLORS" : 30,
+    "N_COLORS" : 100,
 }
 """
 config["PATH_MODEL"] = "C:\\Users\\alexi\\PROJET_3A\\projet_MOTET\\new_imagenette2-160_model.pth"
