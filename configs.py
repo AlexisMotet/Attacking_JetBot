@@ -42,7 +42,7 @@ config = {
     "RATIO_TRAIN_TEST" : 4/5,
     "NORMALIZATION_MEAN" : [0.485, 0.456, 0.406],
     "NORMALIZATION_STD" : [0.229, 0.224, 0.225],
-    "LIMIT_TRAIN_EPOCH_LEN" : -1,
+    "LIMIT_TRAIN_EPOCH_LEN" : 10,
     "LIMIT_TEST_LEN" : -1,
     "N_ENREG_IMG" : 1,
     "N_COLORS" : 100,

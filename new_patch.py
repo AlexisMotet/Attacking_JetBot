@@ -269,5 +269,7 @@ class PatchTrainer():
         self.train_loader = None
         self.test_loader = None
         self.patch = self._get_patch()
+        self.print_loss = float(self.print_module(self.patch))
+        self.tv_loss = float(self.tv_module(self.patch))
         pickle.dump(self, open(path, "wb"))
         

@@ -9,6 +9,8 @@ import pickle
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
 import torchvision
+from printability.new_printability import PrintabilityModule
+from total_variation.new_total_variation import TotalVariationModule
 
 QApplication.setAttribute(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 
@@ -30,7 +32,7 @@ class PatchWidget(QWidget):
         super().__init__()
 
         self.patch_trainer = patch_trainer
-
+        
         hbox = QHBoxLayout()
         vbox = QVBoxLayout()
         figure = Figure()
@@ -55,6 +57,7 @@ class PatchWidget(QWidget):
         button_consts.clicked.connect(self.see_constants)
         button_consts.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
         vbox.addWidget(button_consts)
+        
         for attr in attributes :
             name, val = attr.get_tuple(patch_trainer)
             h = QHBoxLayout()
@@ -103,6 +106,7 @@ class PatchWidget(QWidget):
         
     def see_constants(self):
         message_box = QMessageBox(self)
+        message_box.setFont(QFont(message_box.font().family(), 7))
         message_box.setWindowTitle("Constants")
         text = ""
         for key, value in self.patch_trainer.consts.items() :
@@ -120,7 +124,9 @@ class MainWindow(QMainWindow):
         self.attributes = (u.Attribute("date"),
                             u.Attribute("target_class"),
                             u.Attribute("patch_relative_size"),
-                            u.Attribute("n_epochs"))
+                            u.Attribute("n_epochs"),
+                            u.Attribute("print_loss"),
+                            u.Attribute("tv_loss"))
         
         self.setWindowTitle("Patch Viewer")
         file_menu = self.menuBar().addMenu("File")
