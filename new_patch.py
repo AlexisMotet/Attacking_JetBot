@@ -274,6 +274,7 @@ class PatchTrainer():
             if success_rate >= best_success_rate :
                 best_patch = patch
                 best_success_rate = success_rate
+        best_patch = best_patch.to(torch.device("cpu"))        
         self.patches = None
         self.print_loss = float(self.print_module(best_patch))
         self.tv_loss = float(self.tv_module(best_patch))

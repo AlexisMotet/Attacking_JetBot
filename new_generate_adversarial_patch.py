@@ -1,7 +1,7 @@
 import new_patch
-import constants.constants as c
-from configs import config
+from configs import config_colab
 
-patch_trainer = new_patch.PatchTrainer(config=config, n_epochs=2, patch_relative_size=0.08)
-patch_trainer.train()
-patch_trainer.save_patch("test.patch")
+for i in range(3):
+    patch_trainer = new_patch.PatchTrainer(config=config_colab, n_epochs=5, patch_relative_size=0.08)
+    patch_trainer.train()
+    patch_trainer.save_patch("test.patch")

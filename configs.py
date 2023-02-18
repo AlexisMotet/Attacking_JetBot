@@ -12,8 +12,8 @@ config = {
     "PATH_PRINTABLE_COLORS" : "printability/pantone-colors.json",
     "BATCH_SIZE_TRAIN" : 20,
     "BATCH_SIZE_TEST" : 1,
-    "LAMBDA_TV" : 0.01,
-    "LAMBDA_PRINT" : 0.,
+    "LAMBDA_TV" : 0.0011,
+    "LAMBDA_PRINT" : 0.0025,
     "THRESHOLD" : 0.9,
     "MAX_ITERATIONS" : 10,
     "FX" : 107.75,
@@ -28,11 +28,11 @@ config = {
                                         [0, 0, 0, 1]])),
     "ANGLES_RANGE" : math.radians(5),
     "SCALE_FACTOR_MIN" : 0.9,
-    "X_TOP_LEFT" : 54,
-    "Y_TOP_LEFT" : 50,
-    "X_BOTTOM_RIGHT" : 170,
+    "X_TOP_LEFT" : 44,
+    "Y_TOP_LEFT" : 40,
+    "X_BOTTOM_RIGHT" : 180,
     "Y_BOTTOM_RIGHT" : 140,
-    "NOISE_STD" : 2 * np.array([0.0107681, 0.00957908, 0.01005988]),
+    "NOISE_STD" : np.array([0.0107681, 0.00957908, 0.01005988]),
     "BLUR_KERNEL_SIZE" : 5,
     "BLUR_SIGMA_MAX" : 0.5,
     "BRIGHTNESS_BIAS" : 0.1,
@@ -54,9 +54,9 @@ config["N_CLASSES"] = 10
 """
 config_colab = config.copy()
 
-config_colab["PATH_MODEL"] = "/content/PROJET_3A/new_imagenette2-160_model.pth"
-config_colab["PATH_DATASET"] = "/content/PROJET_3A/imagenette2-160/train/"
+config_colab["PATH_MODEL"] = "/content/PROJET_3A/best_model_extended.pth"
+config_colab["PATH_DATASET"] = "/content/PROJET_3A/dataset/"
 config_colab["N_CLASSES"] = 10
 config_colab["PATH_IMG_FOLDER"] = "/content/projet_3A/images/"
-config_colab["PATH_PRINTABLE_COLORS"] = "/content/projet_3A/printability/printable_colors.txt"
+config_colab["PATH_PRINTABLE_COLORS"] = "/content/projet_3A/printability/pantone-colors.json"
 
