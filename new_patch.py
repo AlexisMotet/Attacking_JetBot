@@ -268,9 +268,6 @@ class PatchTrainer():
         self.model = None
         self.train_loader = None
         self.test_loader = None
-        self.patch_processing_module = None
-        self.tv_module = None
-        self.print_module = None
         best_patch, best_success_rate = None, 0
         for patch, success_rate in self.patches.values() :
             if success_rate >= best_success_rate :

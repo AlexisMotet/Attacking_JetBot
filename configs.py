@@ -10,7 +10,7 @@ config = {
     "PATH_DATASET" : path + 'Projet_Adversarial_Patch/Project_Adverserial_Patch/Collision_Avoidance/dataset/',
     "PATH_IMG_FOLDER" : path +  "projet_MOTET/images/",
     "PATH_PRINTABLE_COLORS" : "printability/pantone-colors.json",
-    "BATCH_SIZE_TRAIN" : 20,
+    "BATCH_SIZE_TRAIN" : 10,
     "BATCH_SIZE_TEST" : 1,
     "LAMBDA_TV" : 0.003,
     "LAMBDA_PRINT" : 0.002,
@@ -56,7 +56,7 @@ config_colab = config.copy()
 
 config_colab["PATH_MODEL"] = "/content/PROJET_3A/best_model_extended.pth"
 config_colab["PATH_DATASET"] = "/content/PROJET_3A/dataset/"
-config_colab["N_CLASSES"] = 10
+config_colab["N_CLASSES"] = 2
 config_colab["PATH_IMG_FOLDER"] = "/content/projet_3A/images/"
 config_colab["PATH_PRINTABLE_COLORS"] = "/content/projet_3A/printability/pantone-colors.json"
 
