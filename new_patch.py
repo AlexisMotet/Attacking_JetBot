@@ -12,7 +12,6 @@ import pickle
 from configs import config
 from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
 
 class PatchTrainer():
     def __init__(self, config=config, 
@@ -274,7 +273,7 @@ class PatchTrainer():
             if success_rate >= best_success_rate :
                 best_patch = patch
                 best_success_rate = success_rate
-        self.patches = None
+        self.patch, self.patches = None, None
         self.print_loss = float(self.print_module(best_patch))
         self.tv_loss = float(self.tv_module(best_patch))
         self.best_patch = best_patch.to(torch.device("cpu"))  
