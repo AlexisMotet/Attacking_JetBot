@@ -19,7 +19,6 @@ class PatchTrainer():
                  path_image_init=None, 
                  target_class=1, 
                  flee_class=0,
-                 random_translation=False,
                  patch_relative_size=0.05, 
                  n_epochs=2):
         
@@ -30,7 +29,6 @@ class PatchTrainer():
         self.path_image_init = path_image_init
         self.target_class = target_class
         self.flee_class = flee_class
-        self.random_translation = random_translation
         self.patch_relative_size = patch_relative_size
         self.n_epochs = n_epochs
 
@@ -118,8 +116,8 @@ class PatchTrainer():
         self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
                          self.c0:self.c0 + self.patch_dim] = patch_
     
-    def attack(self, batch, grad=None):
-        transformed, map_ = self.transfo_tool.random_transform(self.patch, grad)
+    def attack(self, batch):
+        transformed, map_ = self.transfo_tool.random_transform(self.patch)
         mask = self._get_mask(transformed)
         transformed.requires_grad = True
         for i in range(c.consts["MAX_ITERATIONS"] + 1) :
@@ -173,16 +171,8 @@ class PatchTrainer():
                 if torch.cuda.is_available():
                     batch = batch.to(torch.device("cuda"))
                     true_labels = true_labels.to(torch.device("cuda"))
-                if self.random_translation :
-                    vector_scores = self.model(self.normalize(batch))
-                else :
-                    batch.requires_grad = True
-                    vector_scores = self.model(self.normalize(batch))
-                    loss = -torch.nn.functional.log_softmax(vector_scores, dim=1)
-                    torch.mean(loss[:, self.target_class]).backward()
-                    grad = torch.mean(batch.grad, axis=0, keepdim=True)
-                    batch.requires_grad = False
                     
+                vector_scores = self.model(self.normalize(batch))
                 model_labels = torch.argmax(vector_scores, axis=1)
                 
                 logical = torch.logical_and(model_labels == true_labels, 
@@ -203,10 +193,8 @@ class PatchTrainer():
                 total += len(batch)
                 
                 self.patch_processing_module.jitter()
-                if self.random_translation :
-                    first_target_proba, s, attacked = self.attack(batch)
-                else :
-                    first_target_proba, s, attacked = self.attack(batch, grad)
+                first_target_proba, s, attacked = self.attack(batch)
+                
                 successes += s
                 self.target_proba_train[epoch].append(first_target_proba)
 
@@ -226,27 +214,6 @@ class PatchTrainer():
                                                  'epoch%d_batch%d_patch.png'
                                                  % (epoch, i))
                     
-                    if not self.random_translation : 
-                        plt.imshow(self.transfo_tool.binary)
-                        plt.savefig(c.consts["PATH_IMG_FOLDER"] + 
-                                    'epoch%d_batch%d_binary.png'
-                                    % (epoch, i),
-                                    bbox_inches='tight')
-                        plt.imshow(u.tensor_to_array(self.transfo_tool.gray_grad))
-                        plt.savefig(c.consts["PATH_IMG_FOLDER"] + 
-                                    'epoch%d_batch%d_gray_grad.png'
-                                    % (epoch, i),
-                                    bbox_inches='tight')
-                        
-                        plt.imshow(u.tensor_to_array(batch[0]))
-                        r = plt.scatter(self.transfo_tool.kMeans.cluster_centers_[:, 1],
-                                        self.transfo_tool.kMeans.cluster_centers_[:, 0],
-                                        s=100, c="orange")
-                        plt.savefig(c.consts["PATH_IMG_FOLDER"] + 
-                                    'epoch%d_batch%d_clusters.png'
-                                    % (epoch, i),
-                                    bbox_inches='tight')
-                        r.remove()
                 i += 1
                 if c.consts["LIMIT_TRAIN_EPOCH_LEN"] != -1 and \
                         i >= c.consts["LIMIT_TRAIN_EPOCH_LEN"] :
