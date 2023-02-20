@@ -16,8 +16,8 @@ import numpy as np
 class PatchTrainer():
     def __init__(self, config=config, 
                  path_image_init=None, 
-                 target_class=1, 
-                 flee_class=0,
+                 target_class=0, 
+                 flee_class=None,
                  patch_relative_size=0.05, 
                  n_epochs=2):
         
@@ -273,6 +273,8 @@ class PatchTrainer():
             if success_rate >= best_success_rate :
                 best_patch = patch
                 best_success_rate = success_rate
+        if best_patch is None :
+            best_patch = self._get_patch()
         self.patch, self.patches = None, None
         self.print_loss = float(self.print_module(best_patch))
         self.tv_loss = float(self.tv_module(best_patch))

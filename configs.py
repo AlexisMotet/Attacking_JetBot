@@ -27,7 +27,7 @@ config = {
                                         [0.0257, -0.1728, 0.9846, 0],
                                         [0, 0, 0, 1]])),
     "ANGLES_RANGE" : math.radians(5),
-    "SCALE_FACTOR_MIN" : 0.9,
+    "SCALE_FACTOR_MIN" : 0.7,
     "X_TOP_LEFT" : 44,
     "Y_TOP_LEFT" : 40,
     "X_BOTTOM_RIGHT" : 180,
@@ -47,6 +47,24 @@ config = {
     "N_ENREG_IMG" : 1,
     "N_COLORS" : 100,
 }
+
+config_ = config.copy()
+config_["PATH_MODEL"] = "C:/Users/alexi/PROJET_3A/projet_NOUINOU/new_fruit_model.pth"
+config_["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/projet_NOUINOU/new_fruit/train/"
+config_["N_CLASSES"] = 5
+config_["FX"] = 100.
+config_["FY"] = 100.
+config_["CX"] = 112.
+config_["CY"] = 112.
+config_["K1"] = 0.
+config_["K2"] = 0.
+config_["ANGLES_RANGE"] = 0.
+config_["EXTRINSIC_R"] = np.eye(4)
+config_["NOISE_STD"] = 0 * config_["NOISE_STD"]
+config_["X_TOP_LEFT"] = 0
+config_["Y_TOP_LEFT"] = 0
+config_["X_BOTTOM_RIGHT"] = 224
+config_["Y_BOTTOM_RIGHT"] = 224
 """
 config["PATH_MODEL"] = "C:\\Users\\alexi\\PROJET_3A\\projet_MOTET\\new_imagenette2-160_model.pth"
 config["PATH_DATASET"] = "C:\\Users\\alexi\\PROJET_3A\\imagenette2-160\\train\\"

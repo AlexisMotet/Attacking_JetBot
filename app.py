@@ -68,19 +68,32 @@ class PatchWidget(QWidget):
             vbox.addLayout(h)
 
         vbox_plot = QVBoxLayout()
-        
-        for i, e in enumerate(patch_trainer.target_proba_train.keys()) :
+        best_success_rate, best_epoch = 0, None
+        for e, sr in patch_trainer.success_rate_test.items():
+            if sr > best_success_rate :
+                best_success_rate = sr
+                best_epoch = e
+        for e in patch_trainer.target_proba_train.keys() :
             if patch_trainer.n_epochs > 5 :
-                if i%2 == 1 and i != patch_trainer.n_epochs-1:
+                if e%2 == 1 and e != patch_trainer.n_epochs-1 and e!=best_epoch:
                     continue
-            color = random_color()
-            plot = self.create_plot_item("Train epoch %d - "
+            if e!=best_epoch:
+                plot = self.create_plot_item("Train epoch %d - "
                                             "Validation success rate : %.2f%%" % 
                                             (e, patch_trainer.success_rate_test[e]))
-            plot.plot(range(len(patch_trainer.target_proba_train[e])), 
+                plot.plot(range(len(patch_trainer.target_proba_train[e])), 
                         patch_trainer.target_proba_train[e], 
-                        pen=pg.mkPen(color = color, width = 2), 
+                        pen=pg.mkPen(color = random_color(), width = 2), 
                         name="train epoch : %d" % e)
+            else :
+                plot = self.create_plot_item("[BEST] Train epoch %d - "
+                                            "Validation success rate : %.2f%%" % 
+                                            (e, patch_trainer.success_rate_test[e]))
+                plot.plot(range(len(patch_trainer.target_proba_train[e])), 
+                        patch_trainer.target_proba_train[e], 
+                        pen=pg.mkPen(color = (255, 0, 0), width = 5), 
+                        name="train epoch : %d" % e)
+            
             vbox_plot.addWidget(plot)
 
         hbox.addLayout(vbox, 1)

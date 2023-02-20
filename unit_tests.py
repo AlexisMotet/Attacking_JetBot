@@ -19,8 +19,8 @@ def tensor_to_array(tensor):
 
 class Trainer(unittest.TestCase):
     def setUp(self):
-        self.trainer = new_patch.PatchTrainer(path_image_init="dog.JPEG",
-                                              patch_relative_size=0.2)
+        self.trainer = new_patch.PatchTrainer(path_image_init=None,
+                                              patch_relative_size=0.08)
 
     def test_normalization(self):
         _, (ax1, ax2) = plt.subplots(1, 2)
