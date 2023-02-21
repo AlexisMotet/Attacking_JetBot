@@ -16,8 +16,8 @@ import numpy as np
 class PatchTrainer():
     def __init__(self, config=config, 
                  path_image_init=None, 
-                 target_class=0, 
-                 flee_class=None,
+                 target_class=1, 
+                 flee_class=0,
                  patch_relative_size=0.05, 
                  n_epochs=2):
         
@@ -173,7 +173,7 @@ class PatchTrainer():
                     
                 vector_scores = self.model(self.normalize(batch))
                 model_labels = torch.argmax(vector_scores, axis=1)
-                
+
                 logical = torch.logical_and(model_labels == true_labels, 
                                             model_labels != self.target_class)
                 batch = batch[logical]
@@ -181,7 +181,7 @@ class PatchTrainer():
                 
                 if len(batch) == 0:
                     continue    
-                    
+
                 if total == 0 :
                     success_rate = None
                 else :
@@ -193,7 +193,7 @@ class PatchTrainer():
                 
                 self.patch_processing_module.jitter()
                 first_target_proba, s, attacked = self.attack(batch)
-                
+
                 successes += s
                 self.target_proba_train[epoch].append(first_target_proba)
 

@@ -27,7 +27,7 @@ config = {
                                         [0.0257, -0.1728, 0.9846, 0],
                                         [0, 0, 0, 1]])),
     "ANGLES_RANGE" : math.radians(5),
-    "SCALE_FACTOR_MIN" : 0.7,
+    "SCALE_FACTOR_MIN" : 0.9,
     "X_TOP_LEFT" : 44,
     "Y_TOP_LEFT" : 40,
     "X_BOTTOM_RIGHT" : 180,
@@ -39,7 +39,7 @@ config = {
     "CONTRAST_GAIN" : 0.15,
     "RESIZE_DIM" : 256,
     "IMAGE_DIM" : 224,
-    "RATIO_TRAIN_TEST" : 4/5,
+    "RATIO_TRAIN_TEST" : 3/4,
     "NORMALIZATION_MEAN" : [0.485, 0.456, 0.406],
     "NORMALIZATION_STD" : [0.229, 0.224, 0.225],
     "LIMIT_TRAIN_EPOCH_LEN" : -1,
@@ -47,6 +47,11 @@ config = {
     "N_ENREG_IMG" : 1,
     "N_COLORS" : 100,
 }
+
+
+config_test = config.copy()
+config_test["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/dataset2/"
+config_test["BATCH_SIZE_TRAIN"] = 10
 
 config_ = config.copy()
 config_["PATH_MODEL"] = "C:/Users/alexi/PROJET_3A/projet_NOUINOU/new_fruit_model.pth"
