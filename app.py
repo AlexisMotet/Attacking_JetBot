@@ -68,16 +68,12 @@ class PatchWidget(QWidget):
             vbox.addLayout(h)
 
         vbox_plot = QVBoxLayout()
-        best_success_rate, best_epoch = 0, None
-        for e, sr in patch_trainer.success_rate_test.items():
-            if sr > best_success_rate :
-                best_success_rate = sr
-                best_epoch = e
+        n = len(patch_trainer.target_proba_train.keys())
+        linspace = np.linspace(0, n, 5).astype(int)
         for e in patch_trainer.target_proba_train.keys() :
-            if patch_trainer.n_epochs > 5 :
-                if e%2 == 1 and e != patch_trainer.n_epochs-1 and e!=best_epoch:
+            if e not in linspace and e != patch_trainer.best_epoch:
                     continue
-            if e!=best_epoch:
+            elif e!=patch_trainer.best_epoch:
                 plot = self.create_plot_item("Train epoch %d - "
                                             "Validation success rate : %.2f%%" % 
                                             (e, patch_trainer.success_rate_test[e]))

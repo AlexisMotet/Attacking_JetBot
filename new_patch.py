@@ -268,13 +268,12 @@ class PatchTrainer():
         self.model = None
         self.train_loader = None
         self.test_loader = None
-        best_patch, best_success_rate = None, 0
-        for patch, success_rate in self.patches.values() :
+        self.best_epoch, best_patch, best_success_rate = 0, self._get_patch(), 0
+        for e, (patch, success_rate) in self.patches.items() :
             if success_rate >= best_success_rate :
                 best_patch = patch
                 best_success_rate = success_rate
-        if best_patch is None :
-            best_patch = self._get_patch()
+                self.best_epoch = e
         self.patch, self.patches = None, None
         self.print_loss = float(self.print_module(best_patch))
         self.tv_loss = float(self.tv_module(best_patch))
