@@ -55,14 +55,14 @@ config_colab["PATH_IMG_FOLDER"] = "/content/projet_3A/images/"
 config_colab["PATH_PRINTABLE_COLORS"] = "/content/projet_3A/printability/pantone-colors.json"
 
 config_dataset0 = config_colab.copy()
-config_dataset0["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/dataset0/"
+config_dataset0["PATH_DATASET"] = "/content/PROJET_3A/dataset0/"
 
 
-config_dataset1 = config.copy()
-config_dataset1["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/dataset1/"
+config_dataset1 = config_colab.copy()
+config_dataset1["PATH_DATASET"] = "/content/PROJET_3A/dataset1/"
 
-config_dataset2 = config.copy()
-config_dataset2["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/dataset2/"
+config_dataset2 = config_colab.copy()
+config_dataset2["PATH_DATASET"] = "/content/PROJET_3A/dataset2/"
 
 config_ = config.copy()
 config_["PATH_MODEL"] = "C:/Users/alexi/PROJET_3A/projet_NOUINOU/new_fruit_model.pth"
