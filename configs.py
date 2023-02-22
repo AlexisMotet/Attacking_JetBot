@@ -48,10 +48,15 @@ config = {
     "N_COLORS" : 100,
 }
 
+config_dataset0 = config.copy()
+config_dataset0["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/dataset0/"
 
-config_test = config.copy()
-config_test["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/dataset2/"
-config_test["BATCH_SIZE_TRAIN"] = 10
+
+config_dataset1 = config.copy()
+config_dataset1["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/dataset1/"
+
+config_dataset3 = config.copy()
+config_dataset3["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/dataset2/"
 
 config_ = config.copy()
 config_["PATH_MODEL"] = "C:/Users/alexi/PROJET_3A/projet_NOUINOU/new_fruit_model.pth"

@@ -102,8 +102,8 @@ class PatchWidget(QWidget):
         plot.getPlotItem().setMenuEnabled(False)
         plot.getViewBox().setMouseEnabled(False, False)
         plot.getPlotItem().addLegend()
-        plot.getPlotItem().getAxis("bottom").setLabel("images")
-        plot.getPlotItem().getAxis("left").setLabel("% target proba")
+        plot.getPlotItem().getAxis("bottom").setLabel("batches")
+        plot.getPlotItem().getAxis("left").setLabel("% avg target proba")
         plot.getPlotItem().getViewBox().setYRange(0, 1)
         return plot
 

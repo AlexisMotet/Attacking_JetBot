@@ -237,14 +237,8 @@ class PatchTrainer():
                     
             total += len(batch)
             
+            normalized, vector_scores = self.attack_batch(batch)
             self.patch_processing_module.jitter()
-            
-            transformed, _ = self.transfo_tool.random_transform(self.patch)
-            mask = self._get_mask(transformed)
-            modified = self.patch_processing_module(transformed)
-            attacked = torch.mul(1 - mask, batch) + torch.mul(mask, modified)
-            normalized = self.normalize(attacked)
-            vector_scores = self.model(normalized)
             attacked_label = torch.argmax(vector_scores, axis=1)
             vector_proba = torch.nn.functional.softmax(vector_scores, dim=1)
             target_proba = vector_proba[:, self.target_class]
@@ -284,4 +278,23 @@ class PatchTrainer():
         self.tv_module = None
         self.print_module = None
         pickle.dump(self, open(path, "wb"))
+        
+    def load(self, config=config):
+        u.setup_config(config)
+        self.model = u.load_model()
+        self.patch = torch.zeros(1, 3, c.consts["IMAGE_DIM"], c.consts["IMAGE_DIM"])
+        self.patch[:, :, self.r0:self.r0 + self.patch_dim, 
+                         self.c0:self.c0 + self.patch_dim] = self.best_patch
+        self.patch_processing_module = i.PatchProcessingModule()
+        self.tv_module = tv.TotalVariationModule()
+        self.print_module = pt.PrintabilityModule(self.patch_dim)
+        
+    def attack_batch(self, batch):
+        transformed, _ = self.transfo_tool.random_transform(self.patch)
+        mask = self._get_mask(transformed)
+        modified = self.patch_processing_module(transformed)
+        attacked = torch.mul(1 - mask, batch) + torch.mul(mask, modified)
+        normalized = self.normalize(attacked)
+        vector_scores = self.model(normalized)
+        return normalized, vector_scores
         
