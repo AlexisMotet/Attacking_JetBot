@@ -208,7 +208,7 @@ class PatchTrainer():
                                                  'epoch%d_batch%d_attacked.png'
                                                  % (epoch, i))
 
-                    torchvision.utils.save_image(self.patch, 
+                    torchvision.utils.save_image(self._get_patch(), 
                                                  c.consts["PATH_IMG_FOLDER"] + 
                                                  'epoch%d_batch%d_patch.png'
                                                  % (epoch, i))
