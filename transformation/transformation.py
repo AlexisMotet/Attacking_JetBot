@@ -63,7 +63,7 @@ class TransformationTool():
                 ti, tj = point_transformed[:2]
                 
                 r2 = pow(ti, 2) + pow(tj, 2)
-                d = 1/(1 - (c.consts["K1"]*r2 + c.consts["K2"]*r2))
+                d = 1 + c.consts["K1"]*r2 + c.consts["K2"]*r2**2
                 di = ti * d
                 dj = tj * d
                 point_distorted = point_transformed.copy()
