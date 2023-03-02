@@ -1,5 +1,5 @@
 import unittest
-import new_patch
+import patch_trainer
 import constants.constants as c
 import time
 import torch
@@ -19,7 +19,7 @@ def tensor_to_array(tensor):
 
 class Trainer(unittest.TestCase):
     def setUp(self):
-        self.trainer = new_patch.PatchTrainer(path_image_init=None,
+        self.trainer = patch_trainer.PatchTrainer(path_image_init=None,
                                               patch_relative_size=0.08)
 
     def test_normalization(self):
