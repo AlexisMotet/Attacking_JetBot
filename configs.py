@@ -1,14 +1,13 @@
 import math
 import numpy as np
 
-path = "U:/PROJET_3A/"
-path = "C:/Users/alexi/PROJET_3A/"
+path = ""
 
 config = {
-    "PATH_MODEL" : path + 'Projet_Adversarial_Patch/Project_Adverserial_Patch/Collision_Avoidance/best_model_extended.pth',
+    "PATH_MODEL" : "",
     "N_CLASSES" : 2,
-    "PATH_DATASET" : path + 'Projet_Adversarial_Patch/Project_Adverserial_Patch/Collision_Avoidance/dataset/',
-    "PATH_IMG_FOLDER" : path +  "projet_MOTET/images/",
+    "PATH_DATASET" : "",
+    "PATH_IMG_FOLDER" : "images/",
     "PATH_PRINTABLE_COLORS" : "printability/pantone-colors.json",
     "BATCH_SIZE_TRAIN" : 10,
     "BATCH_SIZE_TEST" : 1,
@@ -47,45 +46,6 @@ config = {
     "N_ENREG_IMG" : 1,
     "N_COLORS" : 100,
 }
-config_colab = config.copy()
-
-config_colab["PATH_MODEL"] = "/content/PROJET_3A/best_model_extended.pth"
-config_colab["N_CLASSES"] = 2
-config_colab["PATH_IMG_FOLDER"] = "/content/projet_3A/images/"
-config_colab["PATH_PRINTABLE_COLORS"] = "/content/projet_3A/printability/pantone-colors.json"
-
-config_dataset0 = config_colab.copy()
-config_dataset0["PATH_DATASET"] = "/content/PROJET_3A/dataset0/"
-
-
-config_dataset1 = config_colab.copy()
-config_dataset1["PATH_DATASET"] = "/content/PROJET_3A/dataset1/"
-
-config_dataset2 = config_colab.copy()
-config_dataset2["PATH_DATASET"] = "/content/PROJET_3A/dataset2/"
-
-config_ = config.copy()
-config_["PATH_MODEL"] = "C:/Users/alexi/PROJET_3A/projet_NOUINOU/new_fruit_model.pth"
-config_["PATH_DATASET"] = "C:/Users/alexi/PROJET_3A/projet_NOUINOU/new_fruit/train/"
-config_["N_CLASSES"] = 5
-config_["FX"] = 100.
-config_["FY"] = 100.
-config_["CX"] = 112.
-config_["CY"] = 112.
-config_["K1"] = 0.
-config_["K2"] = 0.
-config_["ANGLES_RANGE"] = 0.
-config_["EXTRINSIC_R"] = np.eye(4)
-config_["NOISE_STD"] = 0 * config_["NOISE_STD"]
-config_["X_TOP_LEFT"] = 0
-config_["Y_TOP_LEFT"] = 0
-config_["X_BOTTOM_RIGHT"] = 224
-config_["Y_BOTTOM_RIGHT"] = 224
-"""
-config["PATH_MODEL"] = "C:\\Users\\alexi\\PROJET_3A\\projet_MOTET\\new_imagenette2-160_model.pth"
-config["PATH_DATASET"] = "C:\\Users\\alexi\\PROJET_3A\\imagenette2-160\\train\\"
-config["N_CLASSES"] = 10
-"""
 
 
 
