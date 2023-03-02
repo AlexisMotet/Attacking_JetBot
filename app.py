@@ -9,6 +9,7 @@ import pickle
 from matplotlib.backends.backend_qt5agg import FigureCanvas
 from matplotlib.figure import Figure
 import torchvision
+import matplotlib.pyplot as plt
 
 QApplication.setAttribute(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 
@@ -26,10 +27,11 @@ def center(window):
     window.move(frame_geometry.topLeft())
             
 class PatchWidget(QWidget):
-    def __init__(self, window, patch_trainer, attributes):
+    def __init__(self, window, patch_trainer, filename, attributes):
         super().__init__()
 
         self.patch_trainer = patch_trainer
+        self.filename = filename
         
         hbox = QHBoxLayout()
         vbox = QVBoxLayout()
@@ -55,6 +57,11 @@ class PatchWidget(QWidget):
         button_consts.clicked.connect(self.see_constants)
         button_consts.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
         vbox.addWidget(button_consts)
+        
+        button_valid_curve = QPushButton("See Validation Curve")
+        button_valid_curve.clicked.connect(self.see_valid_curve)
+        button_valid_curve.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Maximum)
+        vbox.addWidget(button_valid_curve)
         
         for attr in attributes :
             name, val = attr.get_tuple(patch_trainer)
@@ -91,7 +98,6 @@ class PatchWidget(QWidget):
                         name="train epoch : %d" % e)
             
             vbox_plot.addWidget(plot)
-
         hbox.addLayout(vbox, 1)
         hbox.addLayout(vbox_plot, 3)
         
@@ -120,6 +126,22 @@ class PatchWidget(QWidget):
             text += "%s : %s\n" % (str(key), str(value))
         message_box.setText(text)
         message_box.exec_()
+    
+    def see_valid_curve(self):
+        x = range(len(self.patch_trainer.success_rate_test))
+        y = [sr for sr in self.patch_trainer.success_rate_test.values()]
+        z = np.polyfit(x, y, 3)
+        p = np.poly1d(z)
+        plt.plot(x,
+                 y,
+                 label="Validation Curve")
+        plt.plot(x, p(x), label="Polyfit Deg 3")
+        plt.title(self.filename)
+        plt.xlabel("Epoch")
+        plt.ylabel("% Success Rate")
+        plt.ylim(0, 100)
+        plt.legend()
+        plt.show()
         
 class MainWindow(QMainWindow):
     class ThreadAlive(Exception):
@@ -161,7 +183,7 @@ class MainWindow(QMainWindow):
         filenames, _ = QFileDialog.getOpenFileNames(filter="*.patch")
         for filename in filenames :
             patch_trainer = pickle.load(open(filename, "rb"))
-            widget = PatchWidget(self, patch_trainer, self.attributes)
+            widget = PatchWidget(self, patch_trainer, filename, self.attributes)
             scroll_area = QScrollArea()
             scroll_area.setWidget(widget)
             scroll_area.setWidgetResizable(True)
