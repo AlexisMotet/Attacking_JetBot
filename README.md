@@ -1,6 +1,6 @@
-# AttackingJetBot
+# Attacking JetBot (2022 - 2023)
 
-The goal of this project was to attack a JetBot embedded image classifier (https://jetbot.org/master/examples/collision_avoidance.html) with adversarial patches.
+The goal of this engineering school project was to attack a JetBot embedded image classifier (https://jetbot.org/master/examples/collision_avoidance.html) with adversarial patches.
 
 One of the challenges was to generate fake digital images attacked by a patch taking into account the distortion of the camera, its noise and its tilt.
 
