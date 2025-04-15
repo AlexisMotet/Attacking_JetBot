@@ -1,4 +1,4 @@
-# Attacking JetBot (2022 - 2023)
+# Attacking JetBot (engineering school project 2022 - 2023)
 
 The goal of this engineering school project was to attack a JetBot embedded image classifier (https://jetbot.org/master/examples/collision_avoidance.html) with an adversarial patch.
 
